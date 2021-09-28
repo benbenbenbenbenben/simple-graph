@@ -596,6 +596,11 @@
   dependencies:
     "@babel/types" "^7.3.0"
 
+"@types/emscripten@*":
+  version "1.39.5"
+  resolved "https://registry.yarnpkg.com/@types/emscripten/-/emscripten-1.39.5.tgz#eb0fb1048301df980b6f8a5ec3d63f7d1572bb73"
+  integrity sha512-DIOOg+POSrYl+OlNRHQuIEqCd8DCtynG57H862UCce16nXJX7J8eWxNGgOcf8Eyge8zXeSs27mz1UcFu8L/L7g==
+
 "@types/graceful-fs@^4.1.2":
   version "4.1.5"
   resolved "https://registry.yarnpkg.com/@types/graceful-fs/-/graceful-fs-4.1.5.tgz#21ffba0d98da4350db64891f92a9e5db3cdb4e15"
@@ -649,6 +654,14 @@
   version "2.4.1"
   resolved "https://registry.yarnpkg.com/@types/prettier/-/prettier-2.4.1.tgz#e1303048d5389563e130f5bdd89d37a99acb75eb"
   integrity sha512-Fo79ojj3vdEZOHg3wR9ksAMRz4P3S5fDB5e/YWZiFnyFQI1WY2Vftu9XoXVVtJfxB7Bpce/QTqWSSntkz2Znrw==
+
+"@types/sql.js@^1.4.3":
+  version "1.4.3"
+  resolved "https://registry.yarnpkg.com/@types/sql.js/-/sql.js-1.4.3.tgz#190393fd9aff683b880b9fbe3b04b4f6a84c5fbd"
+  integrity sha512-3bz1LJIiJtKMEL8tYf7c9Nrb1lYcFeWQkE8vhWvobE29ZzizW79DtoTjqx1bR82DS2Ch2K30nOwNhuLclZ1vYg==
+  dependencies:
+    "@types/emscripten" "*"
+    "@types/node" "*"
 
 "@types/stack-utils@^2.0.0":
   version "2.0.1"
@@ -3338,6 +3351,11 @@ sprintf-js@~1.0.2:
   version "1.0.3"
   resolved "https://registry.yarnpkg.com/sprintf-js/-/sprintf-js-1.0.3.tgz#04e6926f662895354f3dd015203633b857297e2c"
   integrity sha1-BOaSb2YolTVPPdAVIDYzuFcpfiw=
+
+sql.js@^1.6.1:
+  version "1.6.1"
+  resolved "https://registry.yarnpkg.com/sql.js/-/sql.js-1.6.1.tgz#710e9e4e2b061b12da6c4d10a940edb70dc82e2e"
+  integrity sha512-mQTboXfaaYsqG6leg2tYHppHPShHFDP+vtPjyTBrOCM//8XvnK/OfVYQahS3g6ArvO2a6lvBsHy8w/qZ9a12DQ==
 
 stack-utils@^2.0.3:
   version "2.0.5"
