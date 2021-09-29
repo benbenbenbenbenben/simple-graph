@@ -6,7 +6,7 @@ const loadSql = (filename: string) => {
     return readFileSync(`../sql/${filename}`).toString();
 }
 
-export const createDb = async (schemaFile = "schema.sql") => {
+export const createDb = async (schemaFile = "schema-new.sql") => {
     const database = new (await sqlite).Database();
     database.exec(loadSql(schemaFile));
     return {
@@ -24,10 +24,22 @@ export const createDb = async (schemaFile = "schema.sql") => {
                 return undefined;
             }
         },
-        insertEdge: (fromId: string, toId: string, properties = {}) => {
+        insertEdge: <T extends { id: string }>(fromId: string, toId: string, properties: T = <T>{ id: `${fromId}:${toId}` }) => {
             database.run(loadSql("insert-edge.sql"), [fromId, toId, JSON.stringify(properties)]);
         },
+        deleteEdge: (id: string) => {
+            database.run("DELETE FROM edges WHERE id = ?", [id])
+        },
+        searchEdgeById: <T extends { id: string }>(id: string): { id: string, source: string, target: string, properties: T } | undefined => {
+            const stmt = database.prepare("SELECT * FROM edges wHERE id = ?", [id]);
+            if (stmt.step()) {
+                return stmt.getAsObject() as any as { id: string, source: string, target: string, properties: T & { id: string } }
+            } else {
+                return undefined;
+            }
+        },
         searchEdges: function* <T = any>(fromId: string, toId: string, direction: "fromTo" | "toFrom" | "both" = "fromTo"): IterableIterator<{
+            id: string,
             source: string,
             target: string,
             properties: T
@@ -38,10 +50,10 @@ export const createDb = async (schemaFile = "schema.sql") => {
             }
             const stmt = database.prepare(loadSql("search-edges.sql"), direction === "fromTo" ? [fromId, toId] : [toId, fromId]);
             while (stmt.step()) {
-                const edge = stmt.getAsObject() as any as { source: string, target: string, properties: string };
+                const edge = stmt.getAsObject() as any as { id: string, source: string, target: string, properties: string };
                 yield {
                     ...edge,
-                    properties: JSON.parse(edge.properties) as T
+                    properties: JSON.parse(edge.properties) as (T & { id: string })
                 };
             }
         },

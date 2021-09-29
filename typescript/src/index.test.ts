@@ -1,7 +1,6 @@
 type Unwrap<P> = P extends Promise<infer T> ? Unwrap<T> : P;
-
+import type { createDb } from "./index"
 import sqlite, { Database } from "sql.js";
-import { createDb } from "./index";
 let db: Database;
 
 beforeAll(async () => {
@@ -19,6 +18,7 @@ test("sql.js is okay", async () => {
 })
 
 test("schema is okay", async () => {
+    const { createDb } = await import("./index")
     const db = createDb();
     (await db).close();
 })
@@ -26,6 +26,7 @@ test("schema is okay", async () => {
 describe("sql", () => {
     let db: Unwrap<ReturnType<typeof createDb>>;
     beforeEach(async () => {
+        const { createDb } = await import("./index")
         db = await createDb();
     })
 
@@ -40,10 +41,10 @@ describe("sql", () => {
         expect(deleted).toBeUndefined();
     })
 
-    test("insert-edge & search-edges", async () => {
+    test("insert-edge & search-edges & search-edge-by-id & delete-edge", async () => {
         db.insertNode({ id: "1" });
         db.insertNode({ id: "2" });
-        db.insertEdge("1", "2", { fact: "abc" });
+        db.insertEdge("1", "2", { id: "12abc", fact: "abc" });
         const result1 = db.searchNodeById("1");
         expect(result1).toEqual({ id: "1" })
         const result2 = db.searchNodeById("2");
@@ -51,15 +52,20 @@ describe("sql", () => {
 
         // from-to
         const edgeFT = db.searchEdges("1", "2");
-        expect([...edgeFT]).toEqual([{ source: "1", target: "2", properties: { fact: "abc" } }]);
+        expect([...edgeFT]).toEqual([{ source: "1", target: "2", id: "12abc", properties: { id: "12abc", fact: "abc" } }]);
 
         // to-from
         const edgeTF = db.searchEdges("2", "1", "toFrom");
-        expect([...edgeTF]).toEqual([{ source: "1", target: "2", properties: { fact: "abc" } }]);
+        expect([...edgeTF]).toEqual([{ source: "1", target: "2", id: "12abc", properties: { id: "12abc", fact: "abc" } }]);
 
         // both
         const edgeXX = db.searchEdges("2", "1", "both");
-        expect([...edgeXX]).toEqual([{ source: "1", target: "2", properties: { fact: "abc" } }]);
+        expect([...edgeXX]).toEqual([{ source: "1", target: "2", id: "12abc", properties: { id: "12abc", fact: "abc" } }]);
+
+        const edge = db.searchEdgeById("12abc")!
+        db.deleteEdge(edge.id);
+        const noEdge = db.searchEdgeById(edge.id);
+        expect(noEdge).toBeUndefined();
     })
 
     afterEach(() => {
