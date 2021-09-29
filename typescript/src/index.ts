@@ -66,7 +66,7 @@ export const createDb = async (schemaFile = "schema-new.sql") => {
                 yield JSON.parse(stmt.getAsObject().properties!.toString()) as T;
             }
         },
-        traverse: function* (nodeId: string): IterableIterator<{
+        traverse: function* (nodeId: string, direction: "both" | "sources" | "targets" = "both"): IterableIterator<{
             id: string,
             kind: "node" | "sources" | "targets"
         }> {
@@ -75,10 +75,14 @@ export const createDb = async (schemaFile = "schema-new.sql") => {
                 SELECT :0, '', '()'
                 UNION
                 SELECT id, null, 'node' FROM nodes JOIN traverse ON id = x
-                UNION
-                SELECT source, id as eid, 'sources' FROM edges JOIN traverse ON target = x
-                UNION
-                SELECT target, id as eid, 'targets' FROM edges JOIN traverse ON source = x
+                ${direction !== "targets" ? `
+                    UNION
+                    SELECT source, id as eid, 'sources' FROM edges JOIN traverse ON target = x
+                ` : ``}
+                ${direction !== "sources" ? `
+                    UNION
+                    SELECT target, id as eid, 'targets' FROM edges JOIN traverse ON source = x
+                ` : ``}
               ) SELECT coalesce(z, x) as id, y as kind FROM traverse LIMIT -1 OFFSET 1;
             `
             const stmt = database.prepare(sql, [nodeId]);
@@ -86,9 +90,9 @@ export const createDb = async (schemaFile = "schema-new.sql") => {
                 yield stmt.getAsObject() as any
             }
         },
-        traverseWithBody: function* (nodeId: string): IterableIterator<
+        traverseWithBody: function* <NodeTypes = {}, SourceTypes = {}, TargetTypes = {}>(nodeId: string, direction: "both" | "sources" | "targets" = "both"): IterableIterator<
             { id: string } & (
-                { kind: "node", node: {} } | { kind: "sources", sources: {} } | { kind: "targets", targets: {} }
+                { kind: "node", node: NodeTypes } | { kind: "sources", sources: SourceTypes } | { kind: "targets", targets: TargetTypes }
             )
         > {
             const sql = `
@@ -96,10 +100,14 @@ export const createDb = async (schemaFile = "schema-new.sql") => {
                 SELECT :0, '', '()', '{}'
                 UNION
                 SELECT id, null, 'node', body FROM nodes JOIN traverse ON id = x
-                UNION
-                SELECT source, id as eid, 'sources', properties FROM edges JOIN traverse ON target = x
-                UNION
-                SELECT target, id as eid, 'targets', properties FROM edges JOIN traverse ON source = x
+                ${direction !== "targets" ? `
+                    UNION
+                    SELECT source, id as eid, 'sources', properties FROM edges JOIN traverse ON target = x
+                ` : ``}
+                ${direction !== "sources" ? `
+                    UNION
+                    SELECT target, id as eid, 'targets', properties FROM edges JOIN traverse ON source = x
+                ` : ``}
               ) SELECT coalesce(z, x) as id, y as kind, obj FROM traverse LIMIT -1 OFFSET 1;
             `
             const stmt = database.prepare(sql, [nodeId]);

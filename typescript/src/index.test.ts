@@ -195,8 +195,7 @@ describe("sql", () => {
         db.insertEdge({ source: "c", target: "d" })
         db.insertEdge({ source: "d", target: "e" })
 
-        const results = [...db.traverseWithBody("a")]
-        expect(results).toStrictEqual([
+        expect([...db.traverseWithBody("a")]).toStrictEqual([
             { id: "a", kind: "node", node: { id: "a" } },
             { id: "a:b", kind: "targets", targets: { id: "a:b", source: "a", target: "b" } },
             { id: "b", kind: "node", node: { id: "b" } },
@@ -210,6 +209,18 @@ describe("sql", () => {
             { id: "d:e", kind: "targets", targets: { id: "d:e", source: "d", target: "e" } },
             { id: "e", kind: "node", node: { id: "e" } },
             { id: "d:e", kind: "sources", sources: { id: "d:e", source: "d", target: "e" } },
+        ])
+
+        expect([...db.traverseWithBody("a", "targets")]).toStrictEqual([
+            { id: "a", kind: "node", node: { id: "a" } },
+            { id: "a:b", kind: "targets", targets: { id: "a:b", source: "a", target: "b" } },
+            { id: "b", kind: "node", node: { id: "b" } },
+            { id: "b:c", kind: "targets", targets: { id: "b:c", source: "b", target: "c" } },
+            { id: "c", kind: "node", node: { id: "c" } },
+            { id: "c:d", kind: "targets", targets: { id: "c:d", source: "c", target: "d" } },
+            { id: "d", kind: "node", node: { id: "d" } },
+            { id: "d:e", kind: "targets", targets: { id: "d:e", source: "d", target: "e" } },
+            { id: "e", kind: "node", node: { id: "e" } },
         ])
     })
 
