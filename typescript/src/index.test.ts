@@ -29,13 +29,18 @@ describe("sql", () => {
         db = await createDb();
     })
 
-    test("insert-node & search-node-by-id", async () => {
+    test("insert-node & search-node-by-id & delete-node", async () => {
         await db.insertNode({ id: "1" });
+
         const result = db.searchNodeById("1");
-        expect(result).toEqual({ id: "1" })
+        expect(result).toEqual({ id: "1" });
+
+        db.deleteNode("1");
+        const deleted = db.searchNodeById("1");
+        expect(deleted).toBeUndefined();
     })
 
-    test("insert-edge", async () => {
+    test("insert-edge & search-edges", async () => {
         db.insertNode({ id: "1" });
         db.insertNode({ id: "2" });
         db.insertEdge("1", "2", { fact: "abc" });

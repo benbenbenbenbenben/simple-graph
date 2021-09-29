@@ -13,6 +13,9 @@ export const createDb = async (schemaFile = "schema.sql") => {
         insertNode: <T extends { id: string }>(node: T) => {
             database.run(loadSql("insert-node.sql"), [JSON.stringify(node)]);
         },
+        deleteNode: (id: string) => {
+            database.run(loadSql("delete-node.sql"), [id]);
+        },
         searchNodeById: <T extends { id: string }>(id: string) => {
             const stmt = database.prepare(loadSql("search-node-by-id.sql"), [id]);
             if (stmt.step()) {
