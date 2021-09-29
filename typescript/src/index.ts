@@ -52,12 +52,18 @@ export const createDb = async (schemaFile = "schema-new.sql") => {
                 yield JSON.parse(edge.properties) as T;
             }
         },
-        // TODO: query builder
         searchNodes: function* <T>(query: WhereClause<Partial<T>>) {
             const where = whereClauseToSql(query, "body");
             const stmt = database.prepare(`SELECT * FROM nodes WHERE ${where.sql}`, where.params)
             while (stmt.step()) {
                 yield JSON.parse(stmt.getAsObject().body!.toString()) as T;
+            }
+        },
+        searchEdges: function* <T>(query: WhereClause<Partial<T>>) {
+            const where = whereClauseToSql(query, "properties");
+            const stmt = database.prepare(`SELECT * FROM edges WHERE ${where.sql}`, where.params)
+            while (stmt.step()) {
+                yield JSON.parse(stmt.getAsObject().properties!.toString()) as T;
             }
         },
         raw: (sql: string) => {

@@ -75,6 +75,24 @@ describe("sql", () => {
         }
         db.insertNode<nodeType>({ id: "a", field: "value" })
         const nodes = [...db.searchNodes<nodeType>({ field: { eq: "value" } })]
+        expect(nodes).toStrictEqual([{ id: "a", field: "value" }])
+    })
+
+    test("searchEdges", () => {
+        type nodeType = {
+            id: string
+            field: string
+        }
+        db.insertNode<nodeType>({ id: "a", field: "value" })
+        db.insertNode<nodeType>({ id: "b", field: "value" })
+        db.insertEdge({ source: "a", target: "b", meta: "data" })
+        const edges = [...db.searchEdges<{ meta: string }>({ meta: { eq: "data" } })]
+        expect(edges).toStrictEqual([{
+            id: "a:b",
+            source: "a",
+            target: "b",
+            meta: "data"
+        }])
     })
 
     test("insert-node & update-node", async () => {
