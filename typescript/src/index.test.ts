@@ -31,18 +31,30 @@ describe("sql", () => {
 
     test("insert-node & search-node-by-id", async () => {
         await db.insertNode({ id: "1" });
-        const result = await db.searchNodeById("1");
+        const result = db.searchNodeById("1");
         expect(result).toEqual({ id: "1" })
     })
 
     test("insert-edge", async () => {
-        await db.insertNode({ id: "1" });
-        await db.insertNode({ id: "2" });
-        await db.insertEdge("1", "2");
-        const result1 = await db.searchNodeById("1");
+        db.insertNode({ id: "1" });
+        db.insertNode({ id: "2" });
+        db.insertEdge("1", "2", { fact: "abc" });
+        const result1 = db.searchNodeById("1");
         expect(result1).toEqual({ id: "1" })
-        const result2 = await db.searchNodeById("2");
+        const result2 = db.searchNodeById("2");
         expect(result2).toEqual({ id: "2" })
+
+        // from-to
+        const edgeFT = db.searchEdges("1", "2");
+        expect([...edgeFT]).toEqual([{ source: "1", target: "2", properties: { fact: "abc" } }]);
+
+        // to-from
+        const edgeTF = db.searchEdges("2", "1", "toFrom");
+        expect([...edgeTF]).toEqual([{ source: "1", target: "2", properties: { fact: "abc" } }]);
+
+        // both
+        const edgeXX = db.searchEdges("2", "1", "both");
+        expect([...edgeXX]).toEqual([{ source: "1", target: "2", properties: { fact: "abc" } }]);
     })
 
     afterEach(() => {
