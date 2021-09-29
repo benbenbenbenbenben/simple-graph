@@ -66,6 +66,52 @@ export const createDb = async (schemaFile = "schema-new.sql") => {
                 yield JSON.parse(stmt.getAsObject().properties!.toString()) as T;
             }
         },
+        traverse: function* (nodeId: string): IterableIterator<{
+            id: string,
+            kind: "node" | "sources" | "targets"
+        }> {
+            const sql = `
+                WITH RECURSIVE traverse(x, z, y) AS (
+                SELECT :0, '', '()'
+                UNION
+                SELECT id, null, 'node' FROM nodes JOIN traverse ON id = x
+                UNION
+                SELECT source, id as eid, 'sources' FROM edges JOIN traverse ON target = x
+                UNION
+                SELECT target, id as eid, 'targets' FROM edges JOIN traverse ON source = x
+              ) SELECT coalesce(z, x) as id, y as kind FROM traverse LIMIT -1 OFFSET 1;
+            `
+            const stmt = database.prepare(sql, [nodeId]);
+            while (stmt.step()) {
+                yield stmt.getAsObject() as any
+            }
+        },
+        traverseWithBody: function* (nodeId: string): IterableIterator<
+            { id: string } & (
+                { kind: "node", node: {} } | { kind: "sources", sources: {} } | { kind: "targets", targets: {} }
+            )
+        > {
+            const sql = `
+                WITH RECURSIVE traverse(x, z, y, obj) AS (
+                SELECT :0, '', '()', '{}'
+                UNION
+                SELECT id, null, 'node', body FROM nodes JOIN traverse ON id = x
+                UNION
+                SELECT source, id as eid, 'sources', properties FROM edges JOIN traverse ON target = x
+                UNION
+                SELECT target, id as eid, 'targets', properties FROM edges JOIN traverse ON source = x
+              ) SELECT coalesce(z, x) as id, y as kind, obj FROM traverse LIMIT -1 OFFSET 1;
+            `
+            const stmt = database.prepare(sql, [nodeId]);
+            while (stmt.step()) {
+                const result = stmt.getAsObject() as { kind: "node" | "sources" | "targets", id: string, obj: string }
+                yield {
+                    id: result.id,
+                    kind: result.kind,
+                    [result.kind]: JSON.parse(result.obj),
+                } as unknown as any
+            }
+        },
         raw: (sql: string) => {
             return database.exec(sql);
         },

@@ -156,6 +156,63 @@ describe("sql", () => {
         expect(explicitOrClause.sql).toBe("json_extract(root, '$.foo') = :0 OR (json_extract(root, '$.bar') = :1)")
     })
 
+    test("traverse", () => {
+        db.insertNode({ id: "a" })
+        db.insertNode({ id: "b" })
+        db.insertNode({ id: "c" })
+        db.insertNode({ id: "d" })
+        db.insertNode({ id: "e" })
+        db.insertEdge({ source: "a", target: "b" })
+        db.insertEdge({ source: "b", target: "c" })
+        db.insertEdge({ source: "c", target: "d" })
+        db.insertEdge({ source: "d", target: "e" })
+
+        expect([...db.traverse("a")]).toStrictEqual([
+            { id: "a", kind: "node" },
+            { id: "a:b", kind: "targets" },
+            { id: "b", kind: "node" },
+            { id: "a:b", kind: "sources" },
+            { id: "b:c", kind: "targets" },
+            { id: "c", kind: "node" },
+            { id: "b:c", kind: "sources" },
+            { id: "c:d", kind: "targets" },
+            { id: "d", kind: "node" },
+            { id: "c:d", kind: "sources" },
+            { id: "d:e", kind: "targets" },
+            { id: "e", kind: "node" },
+            { id: "d:e", kind: "sources" },
+        ])
+    })
+
+    test("traverseWithBody", () => {
+        db.insertNode({ id: "a" })
+        db.insertNode({ id: "b" })
+        db.insertNode({ id: "c" })
+        db.insertNode({ id: "d" })
+        db.insertNode({ id: "e" })
+        db.insertEdge({ source: "a", target: "b" })
+        db.insertEdge({ source: "b", target: "c" })
+        db.insertEdge({ source: "c", target: "d" })
+        db.insertEdge({ source: "d", target: "e" })
+
+        const results = [...db.traverseWithBody("a")]
+        expect(results).toStrictEqual([
+            { id: "a", kind: "node", node: { id: "a" } },
+            { id: "a:b", kind: "targets", targets: { id: "a:b", source: "a", target: "b" } },
+            { id: "b", kind: "node", node: { id: "b" } },
+            { id: "a:b", kind: "sources", sources: { id: "a:b", source: "a", target: "b" } },
+            { id: "b:c", kind: "targets", targets: { id: "b:c", source: "b", target: "c" } },
+            { id: "c", kind: "node", node: { id: "c" } },
+            { id: "b:c", kind: "sources", sources: { id: "b:c", source: "b", target: "c" } },
+            { id: "c:d", kind: "targets", targets: { id: "c:d", source: "c", target: "d" } },
+            { id: "d", kind: "node", node: { id: "d" } },
+            { id: "c:d", kind: "sources", sources: { id: "c:d", source: "c", target: "d" } },
+            { id: "d:e", kind: "targets", targets: { id: "d:e", source: "d", target: "e" } },
+            { id: "e", kind: "node", node: { id: "e" } },
+            { id: "d:e", kind: "sources", sources: { id: "d:e", source: "d", target: "e" } },
+        ])
+    })
+
     afterEach(() => {
         db.close();
     })

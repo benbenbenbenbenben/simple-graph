@@ -6,9 +6,9 @@ CREATE TABLE IF NOT EXISTS nodes (
 CREATE INDEX IF NOT EXISTS id_idx ON nodes(id);
 
 CREATE TABLE IF NOT EXISTS edges (
-    source     TEXT,
-    target     TEXT,
     properties TEXT,
+    source     TEXT GENERATED ALWAYS AS (json_extract(properties, '$.source')) VIRTUAL NOT NULL UNIQUE,
+    target     TEXT GENERATED ALWAYS AS (json_extract(properties, '$.target')) VIRTUAL NOT NULL UNIQUE,
     id         TEXT GENERATED ALWAYS AS (json_extract(properties, '$.id')) VIRTUAL NOT NULL UNIQUE,
     FOREIGN KEY(source) REFERENCES nodes(id),
     FOREIGN KEY(target) REFERENCES nodes(id)
