@@ -1,8 +1,10 @@
 {
   "dependencies": {
+    "luxon": "^2.0.2",
     "sql.js": "^1.6.1"
   },
   "devDependencies": {
+    "@types/luxon": "^2.0.4",
     "@types/sql.js": "^1.4.3"
   }
 }
