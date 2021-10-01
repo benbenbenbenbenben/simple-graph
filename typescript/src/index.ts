@@ -52,9 +52,11 @@ export const createDb = async (schemaFile = "schema-new.sql") => {
                 yield JSON.parse(edge.properties) as T;
             }
         },
-        searchNodes: function* <T>(query: WhereClause<Partial<T>>) {
+        searchNodes: function* <T>(query: WhereClause<Partial<T>>, finalClause?: { OFFSET: number, LIMIT: number }) {
             const where = whereClauseToSql(query, "body");
-            const stmt = database.prepare(`SELECT * FROM nodes WHERE ${where.sql}`, where.params)
+            // TODO: this would be better as object params as opposed to array
+            const finalClauseSql = finalClause ? `LIMIT ${finalClause.LIMIT + 0} OFFSET ${finalClause.OFFSET + 0}` : ``;
+            const stmt = database.prepare(`SELECT * FROM nodes WHERE ${where.sql} ${finalClauseSql}`, where.params)
             while (stmt.step()) {
                 yield JSON.parse(stmt.getAsObject().body!.toString()) as T;
             }
@@ -149,7 +151,7 @@ export type WhereClauseOperation<FieldType> =
     }
 
 export type WhereClause<T> = {
-    [K in keyof T]: WhereClauseOperation<T[K]>
+    [K in keyof T]?: WhereClauseOperation<T[K]>
 } & {
     AND?: WhereClause<T>
 } & {

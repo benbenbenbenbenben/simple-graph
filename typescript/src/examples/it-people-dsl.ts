@@ -1,5 +1,5 @@
 import { DateTime } from "luxon"
-import { linetrim, createDb } from "../index"
+import { linetrim, createDb, WhereClause } from "../index"
 
 // Base DSL
 
@@ -174,14 +174,17 @@ export const itPeopleDsl = (database: ReturnType<typeof createDb>) => {
             };
         },
 
-        find: findQueryBuilder((_one, _many) => ({
-            person: (id?: string) => ({
-                one: async () => {
-                    if (id) {
-                        return _one({ id: { eq: `person/${id}` } }) as any as ReturnType<ReturnType<typeof person.create>>["vertex"]
+        find: findQueryBuilder(database, (_one, _many) => ({
+            person: () => ({
+                one: async (idOrQuery?: string | WhereClause<ReturnType<ReturnType<typeof person.create>>["vertex"]>) => {
+                    if (idOrQuery) {
+                        return _one(typeof idOrQuery === "string" ? { id: { eq: `person/${idOrQuery}` } } : idOrQuery) as any as ReturnType<ReturnType<typeof person.create>>["vertex"]
                     } else {
                         return _one({ type: { eq: "person" } }) as any as ReturnType<ReturnType<typeof person.create>>["vertex"]
                     }
+                },
+                many: async (query: WhereClause<ReturnType<ReturnType<typeof person.create>>["vertex"]> = { type: { eq: "person" } }) => {
+                    return _many(query) as any as ReturnType<ReturnType<typeof person.create>>["vertex"][]
                 }
             })
         })
@@ -189,6 +192,13 @@ export const itPeopleDsl = (database: ReturnType<typeof createDb>) => {
     }
 }
 
-const findQueryBuilder = <Domain>(queryBuilder: (one: any, many: any) => Domain): Domain => {
-    return queryBuilder(null, null)
+const findQueryBuilder = <Domain>(database: ReturnType<typeof createDb>, queryBuilder: (one: <NodeType>(query: WhereClause<NodeType>) => any, many: <NodeType>(query: WhereClause<NodeType>) => any) => Domain): Domain => {
+    return queryBuilder(
+        oneQuery => {
+            return database.then(db => [...db.searchNodes(oneQuery, { OFFSET: 0, LIMIT: 1 })][0])
+        },
+        manyQuery => {
+            return database.then(db => [...db.searchNodes(manyQuery)])
+        }
+    )
 }
