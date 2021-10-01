@@ -20,15 +20,17 @@ describe("it-people-dsl", () => {
             JoeBloggsIsAPersonThat.usesTheSkill(TypeScript).at(AcmeInc)
             JoeBloggsIsAPersonThat.usesTheSkill(Python).at(AcmeInc)
             JoeBloggsIsAPersonThat.usesTheSkill(AgileMethodologies).at(AcmeInc)
+
+            return $.dump()
         })
         const joeBloggsGraph = await joeBloggs;
         expect(joeBloggsGraph).toStrictEqual([
-            { id: "company/Acme Inc.", type: "company" },
-            { id: "skill/TypeScript", type: "skill" },
-            { id: "skill/Python", type: "skill" },
-            { id: "skill/Agile", type: "skill" },
-            { id: "job/Software Developer", type: "job" },
-            { id: "person/Joe Bloggs", type: "person" },
+            { node: { id: "company/Acme Inc.", type: "company" } },
+            { node: { id: "skill/TypeScript", type: "skill" } },
+            { node: { id: "skill/Python", type: "skill" } },
+            { node: { id: "skill/Agile", type: "skill" } },
+            { node: { id: "job/Software Developer", type: "job" } },
+            { node: { id: "person/Joe Bloggs", type: "person" } },
         ])
     })
 })
