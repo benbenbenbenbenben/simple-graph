@@ -1,5 +1,5 @@
 import { readFileSync } from "fs";
-import init, { BindParams, Database, SqlValue } from "sql.js";
+import init, { BindParams, Database, ParamsObject, SqlValue } from "sql.js";
 const sqlite = init();
 
 const loadSql = (filename: string) => {
@@ -120,8 +120,13 @@ export const createDb = async (schemaFile = "schema-new.sql") => {
                 } as unknown as any
             }
         },
-        raw: (sql: string) => {
-            return database.exec(sql);
+        raw: (sql: string, ...parameters: SqlValue[]): any[][] => {
+            const paramsObject: ParamsObject = parameters.reduce((o, value, i) => {
+                return { ...o, [`:${i}`]: value }
+            }, {})
+            return database.exec(sql, paramsObject).map(result => {
+                return result.values.map(rows => rows.reduce((obj, col, i) => ({ ...obj, [result.columns[i]]: col }), {}))
+            })
         },
         close: () => {
             database.close();
@@ -184,4 +189,8 @@ export const whereClauseToSql = <T>(query: WhereClause<Partial<T>>, jsonField?: 
         sql: result.sql.trim(),
         params: result.params
     };
+}
+
+export const linetrim = (strings: TemplateStringsArray, ...expr: string[]): string => {
+    return strings.slice(1).reduce((str, fragment, i) => str + expr[i] + fragment, strings[0]).replace(/^.*$/gm, line => line.trim() + `\n`)
 }

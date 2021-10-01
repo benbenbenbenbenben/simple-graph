@@ -1,4 +1,5 @@
 import { DateTime } from "luxon"
+import { linetrim, createDb } from "../index"
 
 // Base DSL
 
@@ -110,7 +111,7 @@ type createBuilder = {
     person: ReturnType<typeof person.create>,
     job: ReturnType<typeof job.create>,
     // TODO: could these be keyed?
-    dump: () => (NodeLike<string> | EdgeLike<string>)[]
+    dump: () => ({ node: NodeLike<string> } | { edge: EdgeLike<string> })[]
 }
 
 const before = <Func extends (...args: any[]) => any>(
@@ -125,27 +126,69 @@ const after = <Func extends (...args: any[]) => any>(
 }
 
 
-export const create = <OptionalOutput>(query: ($: createBuilder) => OptionalOutput) => {
-    const updates: any[] = []
-    const cursorForVertex = <VertexType extends string>(node: NodeLike<VertexType>) => <Edges>(edges: Edges): VertexFindOrCreate<VertexType, Edges> => {
-        updates.push({ node })
-        return {
-            vertex: node,
-            ...edges
-        }
+export const itPeopleDsl = (database: ReturnType<typeof createDb>) => {
+
+    return {
+        create: async <OptionalOutput>(query: ($: createBuilder) => OptionalOutput) => {
+            const updates: ({ node: NodeLike<string> } | { edge: EdgeLike<string> })[] = []
+            const cursorForVertex = <VertexType extends string>(node: NodeLike<VertexType>) => <Edges>(edges: Edges): VertexFindOrCreate<VertexType, Edges> => {
+                updates.push({ node })
+                return {
+                    vertex: node,
+                    ...edges
+                }
+            }
+            const cursorForEdgeSourceToTarget = <EdgeType extends string>(edge: EdgeLike<EdgeType>) => <TargetVertexCursor>(vertexTargets: TargetVertexCursor) => {
+                updates.push({ edge })
+                return {
+                    ...vertexTargets
+                }
+            }
+            const createOutput = query({
+                company: company.create(cursorForVertex, cursorForEdgeSourceToTarget),
+                skill: skill.create(cursorForVertex, cursorForEdgeSourceToTarget),
+                person: person.create(cursorForVertex, cursorForEdgeSourceToTarget),
+                job: job.create(cursorForVertex, cursorForEdgeSourceToTarget),
+                dump: () => [...updates]
+            })
+            // TODO: convert updates to query and execute (behind an await)
+            const nodes = (<any[]>updates).map(({ node }) => node as NodeLike<string>).filter(x => x)
+            const edges = (<any[]>updates).map(({ edge }) => edge as EdgeLike<string>).filter(x => x)
+            const sql = linetrim`
+                BEGIN TRANSACTION;
+                
+                INSERT INTO nodes VALUES ${nodes.map((_, i) => `(:${i})`).join(", ")};
+                INSERT INTO edges VALUES ${edges.map((_, i) => `(:${nodes.length + i})`).join(", ")};
+
+                COMMIT TRANSACTION;
+                SELECT 1 as ok;
+            `
+            return {
+                preview: () => sql,
+                execute: async () => {
+                    const db = await database
+                    const result = db.raw(sql, ...[...nodes, ...edges].map(node => JSON.stringify(node)))
+                    return result[0][0].ok === 1
+                },
+                createOutput
+            };
+        },
+
+        find: findQueryBuilder((_one, _many) => ({
+            person: (id?: string) => ({
+                one: async () => {
+                    if (id) {
+                        return _one({ id: { eq: `person/${id}` } }) as any as ReturnType<ReturnType<typeof person.create>>["vertex"]
+                    } else {
+                        return _one({ type: { eq: "person" } }) as any as ReturnType<ReturnType<typeof person.create>>["vertex"]
+                    }
+                }
+            })
+        })
+        )
     }
-    const cursorForEdgeSourceToTarget = <EdgeType extends string>(edge: EdgeLike<EdgeType>) => <TargetVertexCursor>(vertexTargets: TargetVertexCursor) => {
-        updates.push({ edge })
-        return {
-            ...vertexTargets
-        }
-    }
-    const compilation = query({
-        company: company.create(cursorForVertex, cursorForEdgeSourceToTarget),
-        skill: skill.create(cursorForVertex, cursorForEdgeSourceToTarget),
-        person: person.create(cursorForVertex, cursorForEdgeSourceToTarget),
-        job: job.create(cursorForVertex, cursorForEdgeSourceToTarget),
-        dump: () => [...updates]
-    })
-    return compilation;
+}
+
+const findQueryBuilder = <Domain>(queryBuilder: (one: any, many: any) => Domain): Domain => {
+    return queryBuilder(null, null)
 }
