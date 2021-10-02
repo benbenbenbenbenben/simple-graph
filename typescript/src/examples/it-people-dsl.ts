@@ -175,18 +175,8 @@ export const itPeopleDsl = (database: ReturnType<typeof createDb>) => {
         },
 
         find: findQueryBuilder(database, (_one, _many) => ({
-            person: () => ({
-                one: async (idOrQuery?: string | WhereClause<ReturnType<ReturnType<typeof person.create>>["vertex"]>) => {
-                    if (idOrQuery) {
-                        return _one(typeof idOrQuery === "string" ? { id: { eq: `person/${idOrQuery}` } } : idOrQuery) as any as ReturnType<ReturnType<typeof person.create>>["vertex"]
-                    } else {
-                        return _one({ type: { eq: "person" } }) as any as ReturnType<ReturnType<typeof person.create>>["vertex"]
-                    }
-                },
-                many: async (query: WhereClause<ReturnType<ReturnType<typeof person.create>>["vertex"]> = { type: { eq: "person" } }) => {
-                    return _many(query) as any as ReturnType<ReturnType<typeof person.create>>["vertex"][]
-                }
-            })
+            person: () => findOneOrMany<ReturnType<ReturnType<typeof person.create>>["vertex"]>("person", _one, _many),
+            company: () => findOneOrMany<ReturnType<ReturnType<typeof company.create>>["vertex"]>("company", _one, _many),
         })
         )
     }
@@ -202,3 +192,16 @@ const findQueryBuilder = <Domain>(database: ReturnType<typeof createDb>, queryBu
         }
     )
 }
+
+const findOneOrMany = <VertexType extends NodeLike<string>>(databaseNodeTypeName: string, _one: <NodeType>(query: WhereClause<NodeType>) => any, _many: <NodeType>(query: WhereClause<NodeType>) => any) => ({
+    one: async (idOrQuery?: string | WhereClause<VertexType>) => {
+        if (idOrQuery) {
+            return _one(typeof idOrQuery === "string" ? <WhereClause<VertexType>>{ id: { eq: `${databaseNodeTypeName}/${idOrQuery}` } } : idOrQuery) as VertexType
+        } else {
+            return _one({ type: { eq: databaseNodeTypeName } }) as VertexType
+        }
+    },
+    many: async (query = <WhereClause<VertexType>>{ type: { eq: databaseNodeTypeName } }) => {
+        return _many(query) as any as VertexType[]
+    }
+})

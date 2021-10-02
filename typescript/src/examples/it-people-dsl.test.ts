@@ -5,7 +5,7 @@ import { itPeopleDsl } from "./it-people-dsl"
 describe("it-people-dsl", () => {
     test("create a person Joe Bloggs that works at Acme Inc. as a Software Developer", async () => {
 
-        const jsonObjectSort = (a: any, b: any) => [JSON.stringify(a), JSON.stringify(b)].sort
+        const jsonObjectSort = (a: any, b: any) => JSON.stringify(a).localeCompare(JSON.stringify(b))
 
         // bind the DSL to newly created database
         const database = createDb()
@@ -44,10 +44,9 @@ describe("it-people-dsl", () => {
 
         // run the graph
         const joeBloggsGraph = await joeBloggsQuery;
-        expect(joeBloggsGraph.createOutput.sort(jsonObjectSort)).toEqual([
+        expect(joeBloggsGraph.createOutput).toEqual([
             // nodes
             { node: { id: "company/Acme Inc.", type: "company" } },
-            { node: { id: "company/Widget Factory", type: "company" } },
             { node: { id: "skill/TypeScript", type: "skill" } },
             { node: { id: "skill/Python", type: "skill" } },
             { node: { id: "skill/Agile", type: "skill" } },
@@ -55,18 +54,20 @@ describe("it-people-dsl", () => {
             { node: { id: "person/Joe Bloggs", type: "person" } },
             // edges
             { edge: { source: "person/Joe Bloggs", target: "company/Acme Inc.", type: "worksAt", beginning: worksAtAcmeBeginning } },
-            { edge: { source: "person/Joe Bloggs", target: "company/Widget Factory", type: "worksAt", beginning: worksAtWidgetFactoryBeginning, ending: worksAtWidgetFactoryEnding } },
             { edge: { source: "person/Joe Bloggs", target: "skill/TypeScript", type: "usesTheSkill" } },
             { edge: { source: "person/Joe Bloggs", target: "skill/Python", type: "usesTheSkill" } },
             { edge: { source: "person/Joe Bloggs", target: "skill/Agile", type: "usesTheSkill" } },
-        ].sort(jsonObjectSort))
+            // extra
+            { node: { id: "company/Widget Factory", type: "company" } },
+            { edge: { source: "person/Joe Bloggs", target: "company/Widget Factory", type: "worksAt", beginning: worksAtWidgetFactoryBeginning, ending: worksAtWidgetFactoryEnding } },
+        ])
 
         // verify the generated create SQL
         expect(joeBloggsGraph.preview()).toBe(linetrim`
             BEGIN TRANSACTION;
 
-            INSERT INTO nodes VALUES (:0), (:1), (:2), (:3), (:4), (:5);
-            INSERT INTO edges VALUES (:6), (:7), (:8), (:9);
+            INSERT INTO nodes VALUES (:0), (:1), (:2), (:3), (:4), (:5), (:6);
+            INSERT INTO edges VALUES (:7), (:8), (:9), (:10), (:11);
 
             COMMIT TRANSACTION;
             SELECT 1 as ok;
@@ -90,5 +91,8 @@ describe("it-people-dsl", () => {
         expect(await find.person().one()).toEqual(joeBloggsFound)
         // ...and check it's [Joe Bloggs] when we take all persons
         expect(await find.person().many()).toEqual([joeBloggsFound])
+
+        // there are 2 companies
+        expect((await find.company().many()).length).toBe(2)
     })
 })
