@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "ts-node-dev --respawn -- src/",
     "build": "tsc",
-    "test": "node --experimental-vm-modules node_modules/.bin/jest",
-    "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --watch"
+    "test": "node --experimental-vm-modulesv--no-warnings node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules --no-warnings node_modules/jest/bin/jest.js --watch"
   },
   "devDependencies": {
     "@types/jest": "^27.0.2",

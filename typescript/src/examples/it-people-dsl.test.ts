@@ -5,8 +5,6 @@ import { itPeopleDsl } from "./it-people-dsl"
 describe("it-people-dsl", () => {
     test("create a person Joe Bloggs that works at Acme Inc. as a Software Developer", async () => {
 
-        const jsonObjectSort = (a: any, b: any) => JSON.stringify(a).localeCompare(JSON.stringify(b))
-
         // bind the DSL to newly created database
         const database = createDb()
         const { create, find } = itPeopleDsl(database)
@@ -35,8 +33,13 @@ describe("it-people-dsl", () => {
             JoeBloggsIsAPersonThat.usesTheSkill(Python).at(AcmeInc)
             JoeBloggsIsAPersonThat.usesTheSkill(AgileMethodologies).at(AcmeInc)
 
+            // Joe worked at Widget Factory
             const WidgetFactory = $.company("Widget Factory")
             JoeBloggsIsAPersonThat.worksAt(WidgetFactory, { beginning: worksAtWidgetFactoryBeginning, ending: worksAtWidgetFactoryEnding }).as(SoftwareDeveloper, { level: "mid" })
+
+            // connect Software Developer to Agile skill
+            const { that: SoftwareDeveloperIsARoleThat } = SoftwareDeveloper
+            SoftwareDeveloperIsARoleThat.mayRequire(AgileMethodologies)
 
             // return all the updates so we can examine them (as .createOutput: any | void)
             return $.dump()
@@ -60,6 +63,7 @@ describe("it-people-dsl", () => {
             // extra
             { node: { id: "company/Widget Factory", type: "company" } },
             { edge: { source: "person/Joe Bloggs", target: "company/Widget Factory", type: "worksAt", beginning: worksAtWidgetFactoryBeginning, ending: worksAtWidgetFactoryEnding } },
+            { edge: { source: "job/Software Developer", target: "skill/Agile", type: "mayRequire" } }
         ])
 
         // verify the generated create SQL
