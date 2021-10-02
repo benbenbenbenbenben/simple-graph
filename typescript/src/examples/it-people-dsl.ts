@@ -15,17 +15,14 @@ type CursorForVertex = <VertexType extends string>(node: NodeLike<VertexType>) =
 type EdgeLike<T extends string> = { source: string, target: string, type: T }
 type CursorForEdgeSourceToTarget = <EdgeType extends string>(edge: EdgeLike<EdgeType>) => <TargetVertexCursor>(vertexTargets: TargetVertexCursor) => TargetVertexCursor
 
-
-// IT People DSL
-
 const nodeType = <NodeType extends string, CreateEdges = {}>(type: NodeType, createEdges?: (
     cursorForEdgeSourceToTarget: CursorForEdgeSourceToTarget, sourceName: string) => CreateEdges): {
         create: (
             cursorForVertex: CursorForVertex,
             cursorForEdgeSourceToTarget: CursorForEdgeSourceToTarget
         ) => (
-            name: string
-        ) => VertexFindOrCreate<NodeType, CreateEdges>;
+                name: string
+            ) => VertexFindOrCreate<NodeType, CreateEdges>;
     } => ({
         create: (
             cursorForVertex: CursorForVertex,
@@ -37,11 +34,15 @@ const nodeType = <NodeType extends string, CreateEdges = {}>(type: NodeType, cre
         })(createEdges ? createEdges(cursorForEdgeSourceToTarget, name) : <CreateEdges>{})
     })
 
+
+type EdgeType<T extends { create: any }> = ReturnType<ReturnType<T["create"]>>
+
+// IT People DSL
 const company = nodeType("company")
 const skill = nodeType("skill")
 const job = nodeType("job", () => ({
     that: {
-        mayRequireTheSkill: (_skill: ReturnType<ReturnType<typeof skill.create>>) => {
+        mayRequireTheSkill: (_skill: EdgeType<typeof skill>) => {
             return _skill
         }
     }
