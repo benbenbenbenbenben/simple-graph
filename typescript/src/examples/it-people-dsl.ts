@@ -18,92 +18,123 @@ type CursorForEdgeSourceToTarget = <EdgeType extends string>(edge: EdgeLike<Edge
 
 // IT People DSL
 
-const company = {
-    create: (
-        cursorForVertex: CursorForVertex,
-        cursorForEdgeSourceToTarget: CursorForEdgeSourceToTarget
-    ) => (
-        name: string
-    ) => cursorForVertex<"company">({
-        id: `company/${name}`, type: "company"
-    })({
-
+const nodeType = <NodeType extends string, CreateEdges = {}>(type: NodeType, createEdges?: (
+    cursorForEdgeSourceToTarget: CursorForEdgeSourceToTarget, sourceName: string) => CreateEdges): {
+        create: (
+            cursorForVertex: CursorForVertex,
+            cursorForEdgeSourceToTarget: CursorForEdgeSourceToTarget
+        ) => (
+            name: string
+        ) => VertexFindOrCreate<NodeType, CreateEdges>;
+    } => ({
+        create: (
+            cursorForVertex: CursorForVertex,
+            cursorForEdgeSourceToTarget: CursorForEdgeSourceToTarget
+        ) => (
+            name: string
+        ) => cursorForVertex<NodeType>({
+            id: `${type}/${name}`, type
+        })(createEdges ? createEdges(cursorForEdgeSourceToTarget, name) : <CreateEdges>{})
     })
-}
-const skill = {
-    create: (
-        cursorForVertex: CursorForVertex,
-        cursorForEdgeSourceToTarget: CursorForEdgeSourceToTarget
-    ) => (
-        name: string
-    ) => cursorForVertex<"skill">({
-        id: `skill/${name}`, type: "skill"
-    })({
 
-    })
-}
-const person = {
-    create: (
-        cursorForVertex: CursorForVertex,
-        cursorForEdgeSourceToTarget: CursorForEdgeSourceToTarget
-    ) => (
-        name: string
-    ) => cursorForVertex<"person">({
-        id: `person/${name}`, type: "person"
-    })({
-        /* contextual edges */
-        that: {
-            worksAt: (
-                _company: ReturnType<ReturnType<typeof company.create>>,
-                properties: {
-                    beginning: DateTime,
-                    ending?: DateTime,
-                    fulltime?: boolean,
-                }) => cursorForEdgeSourceToTarget<"worksAt">({
-                    type: "worksAt", ...properties,
-                    source: `person/${name}`,
-                    target: _company.vertex.id
-                })({
-                    as: (
-                        _job: ReturnType<ReturnType<typeof job.create>>,
-                        properties: {
-                            //                         
-                        }) => {
-                        // TODO: what do we do here?
-                        return _job
-                    }
-                }),
-            usesTheSkill: (
-                _skill: ReturnType<ReturnType<typeof skill.create>>
-            ) => cursorForEdgeSourceToTarget<"usesTheSkill">({
-                type: "usesTheSkill",
-                source: `person/${name}`,
-                target: _skill.vertex.id
+const company = nodeType("company")
+const skill = nodeType("skill")
+const job = nodeType("job", () => ({
+    that: {
+        mayRequireTheSkill: (_skill: ReturnType<ReturnType<typeof skill.create>>) => {
+            return _skill
+        }
+    }
+}))
+
+const person = nodeType("person", (cursorForEdgeSourceToTarget: CursorForEdgeSourceToTarget, sourceName: string) => ({
+    /* contextual edges */
+    that: {
+        worksAt: (
+            _company: ReturnType<ReturnType<typeof company.create>>,
+            properties: {
+                beginning: DateTime,
+                ending?: DateTime,
+                fulltime?: boolean,
+            }) => cursorForEdgeSourceToTarget<"worksAt">({
+                type: "worksAt", ...properties,
+                source: `person/${sourceName}`,
+                target: _company.vertex.id
             })({
-                at: (
-                    _company: ReturnType<ReturnType<typeof company.create>>
-                ) => {
+                as: (
+                    _job: ReturnType<ReturnType<typeof job.create>>,
+                    properties: {
+                        //                         
+                    }) => {
                     // TODO: what do we do here?
-                    return _company
+                    return _job
                 }
-            })
-        }
-    })
-}
-const job = {
-    create: (
-        cursorForVertex: CursorForVertex,
-        cursorForEdgeSourceToTarget: CursorForEdgeSourceToTarget
-    ) => (
-        name: string
-    ) => cursorForVertex<"job">({ id: `job/${name}`, type: "job" })({
-        that: {
-            mayRequireTheSkill: (_skill: ReturnType<ReturnType<typeof skill.create>>) => {
-                return _skill
+            }),
+        usesTheSkill: (
+            _skill: ReturnType<ReturnType<typeof skill.create>>
+        ) => cursorForEdgeSourceToTarget<"usesTheSkill">({
+            type: "usesTheSkill",
+            source: `person/${sourceName}`,
+            target: _skill.vertex.id
+        })({
+            at: (
+                _company: ReturnType<ReturnType<typeof company.create>>
+            ) => {
+                // TODO: what do we do here?
+                return _company
             }
-        }
-    })
-}
+        })
+    }
+}))
+
+// const person = {
+//     create: (
+//         cursorForVertex: CursorForVertex,
+//         cursorForEdgeSourceToTarget: CursorForEdgeSourceToTarget
+//     ) => (
+//         name: string
+//     ) => cursorForVertex<"person">({
+//         id: `person/${name}`, type: "person"
+//     })({
+//         /* contextual edges */
+//         that: {
+//             worksAt: (
+//                 _company: ReturnType<ReturnType<typeof company.create>>,
+//                 properties: {
+//                     beginning: DateTime,
+//                     ending?: DateTime,
+//                     fulltime?: boolean,
+//                 }) => cursorForEdgeSourceToTarget<"worksAt">({
+//                     type: "worksAt", ...properties,
+//                     source: `person/${name}`,
+//                     target: _company.vertex.id
+//                 })({
+//                     as: (
+//                         _job: ReturnType<ReturnType<typeof job.create>>,
+//                         properties: {
+//                             //                         
+//                         }) => {
+//                         // TODO: what do we do here?
+//                         return _job
+//                     }
+//                 }),
+//             usesTheSkill: (
+//                 _skill: ReturnType<ReturnType<typeof skill.create>>
+//             ) => cursorForEdgeSourceToTarget<"usesTheSkill">({
+//                 type: "usesTheSkill",
+//                 source: `person/${name}`,
+//                 target: _skill.vertex.id
+//             })({
+//                 at: (
+//                     _company: ReturnType<ReturnType<typeof company.create>>
+//                 ) => {
+//                     // TODO: what do we do here?
+//                     return _company
+//                 }
+//             })
+//         }
+//     })
+// }
 
 type createBuilder = {
     company: ReturnType<typeof company.create>,
