@@ -71,7 +71,7 @@ describe("it-people-dsl", () => {
             BEGIN TRANSACTION;
 
             INSERT INTO nodes VALUES (:0), (:1), (:2), (:3), (:4), (:5), (:6);
-            INSERT INTO edges VALUES (:7), (:8), (:9), (:10), (:11);
+            INSERT INTO edges VALUES (:7), (:8), (:9), (:10), (:11), (:12);
 
             COMMIT TRANSACTION;
             SELECT 1 as ok;

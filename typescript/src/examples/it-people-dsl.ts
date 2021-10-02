@@ -40,9 +40,13 @@ type EdgeType<T extends { create: any }> = ReturnType<ReturnType<T["create"]>>
 // IT People DSL
 const company = nodeType("company")
 const skill = nodeType("skill")
-const job = nodeType("job", () => ({
+const job = nodeType("job", (c, n) => ({
     that: {
-        mayRequire: (_skill: EdgeType<typeof skill>) => _skill
+        mayRequire: (_skill: EdgeType<typeof skill>) => c({
+            type: "mayRequire",
+            source: `job/${n}`,
+            target: _skill.vertex.id
+        })({})
     }
 }))
 
