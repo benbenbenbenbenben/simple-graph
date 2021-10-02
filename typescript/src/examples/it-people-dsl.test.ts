@@ -22,8 +22,8 @@ describe("it-people-dsl", () => {
             const TypeScript = $.skill("TypeScript")
             const Python = $.skill("Python")
             const AgileMethodologies = $.skill("Agile")
-            // job
-            const SoftwareDeveloper = $.job("Software Developer")
+            // occupation
+            const SoftwareDeveloper = $.occupation("Software Developer")
             // person
             const JoeBloggs = $.person("Joe Bloggs")
             const { that: JoeBloggsIsAPersonThat } = JoeBloggs
@@ -53,7 +53,7 @@ describe("it-people-dsl", () => {
             { node: { id: "skill/TypeScript", type: "skill" } },
             { node: { id: "skill/Python", type: "skill" } },
             { node: { id: "skill/Agile", type: "skill" } },
-            { node: { id: "job/Software Developer", type: "job" } },
+            { node: { id: "occupation/Software Developer", type: "occupation" } },
             { node: { id: "person/Joe Bloggs", type: "person" } },
             // edges
             { edge: { source: "person/Joe Bloggs", target: "company/Acme Inc.", type: "worksAt", beginning: worksAtAcmeBeginning } },
@@ -63,7 +63,7 @@ describe("it-people-dsl", () => {
             // extra
             { node: { id: "company/Widget Factory", type: "company" } },
             { edge: { source: "person/Joe Bloggs", target: "company/Widget Factory", type: "worksAt", beginning: worksAtWidgetFactoryBeginning, ending: worksAtWidgetFactoryEnding } },
-            { edge: { source: "job/Software Developer", target: "skill/Agile", type: "mayRequire" } }
+            { edge: { source: "occupation/Software Developer", target: "skill/Agile", type: "mayRequire" } }
         ])
 
         // verify the generated create SQL

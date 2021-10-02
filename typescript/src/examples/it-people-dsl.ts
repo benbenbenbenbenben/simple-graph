@@ -16,41 +16,43 @@ type EdgeLike<T extends string> = { source: string, target: string, type: T }
 type CursorForEdgeSourceToTarget = <EdgeType extends string>(edge: EdgeLike<EdgeType>) => <TargetVertexCursor>(vertexTargets: TargetVertexCursor) => TargetVertexCursor
 
 const nodeType = <NodeType extends string, CreateEdges = {}>(type: NodeType, createEdges?: (
-    cursorForEdgeSourceToTarget: CursorForEdgeSourceToTarget, sourceName: string) => CreateEdges): {
+    withEdge: CursorForEdgeSourceToTarget, sourceName: string) => CreateEdges): {
         create: (
             cursorForVertex: CursorForVertex,
-            cursorForEdgeSourceToTarget: CursorForEdgeSourceToTarget
+            withEdge: CursorForEdgeSourceToTarget
         ) => (
                 name: string
             ) => VertexFindOrCreate<NodeType, CreateEdges>;
     } => ({
         create: (
             cursorForVertex: CursorForVertex,
-            cursorForEdgeSourceToTarget: CursorForEdgeSourceToTarget
+            withEdge: CursorForEdgeSourceToTarget
         ) => (
             name: string
         ) => cursorForVertex<NodeType>({
             id: `${type}/${name}`, type
-        })(createEdges ? createEdges(cursorForEdgeSourceToTarget, name) : <CreateEdges>{})
+        })(createEdges ? createEdges(withEdge, name) : <CreateEdges>{})
     })
 
 
 type EdgeType<T extends { create: any }> = ReturnType<ReturnType<T["create"]>>
 
 // IT People DSL
+const job = nodeType("job")
 const company = nodeType("company")
 const skill = nodeType("skill")
-const job = nodeType("job", (c, n) => ({
+const occupation = nodeType("occupation", (withEdge, occupationName) => ({
     that: {
-        mayRequire: (_skill: EdgeType<typeof skill>) => c({
+        mayRequire: (
+            _skill: EdgeType<typeof skill>
+        ) => withEdge({
             type: "mayRequire",
-            source: `job/${n}`,
+            source: `occupation/${occupationName}`,
             target: _skill.vertex.id
         })({})
     }
 }))
-
-const person = nodeType("person", (cursorForEdgeSourceToTarget: CursorForEdgeSourceToTarget, sourceName: string) => ({
+const person = nodeType("person", (withEdge: CursorForEdgeSourceToTarget, personName: string) => ({
     /* contextual edges */
     that: {
         worksAt: (
@@ -59,25 +61,29 @@ const person = nodeType("person", (cursorForEdgeSourceToTarget: CursorForEdgeSou
                 beginning: DateTime,
                 ending?: DateTime,
                 fulltime?: boolean,
-            }) => cursorForEdgeSourceToTarget<"worksAt">({
-                type: "worksAt", ...properties,
-                source: `person/${sourceName}`,
-                target: _company.vertex.id
-            })({
-                as: (
-                    _job: EdgeType<typeof job>,
-                    properties: {
-                        //                         
-                    }) => {
-                    // TODO: what do we do here?
-                    return _job
-                }
-            }),
+            }
+        ) => withEdge({
+            type: "worksAt", ...properties,
+            source: `person/${personName}`,
+            target: _company.vertex.id
+        })({
+            as: (
+                _occupation: EdgeType<typeof occupation>,
+                properties: {
+                    //                         
+                }) => {
+                // TODO: what do we do here?
+                // 1. connect the occupation to a job vert (occupation>>-includesJob->job->isWithinOccupation->>occupation)
+                // 2. connect the person to the job vert (person>>-hasJob->job->workedBy->>person)
+                // 3. connect the person to the occupation vert (person>>-worksAs->occupation->doneBy->>person) 
+                return _occupation
+            }
+        }),
         usesTheSkill: (
             _skill: EdgeType<typeof skill>
-        ) => cursorForEdgeSourceToTarget<"usesTheSkill">({
+        ) => withEdge<"usesTheSkill">({
             type: "usesTheSkill",
-            source: `person/${sourceName}`,
+            source: `person/${personName}`,
             target: _skill.vertex.id
         })({
             at: (
@@ -94,7 +100,7 @@ type createBuilder = {
     company: ReturnType<typeof company.create>,
     skill: ReturnType<typeof skill.create>,
     person: ReturnType<typeof person.create>,
-    job: ReturnType<typeof job.create>,
+    occupation: ReturnType<typeof occupation.create>,
     // TODO: could these be keyed?
     dump: () => ({ node: NodeLike<string> } | { edge: EdgeLike<string> })[]
 }
@@ -130,7 +136,7 @@ const createActivity = (database: ReturnType<typeof createDb>) => async <Optiona
         company: company.create(cursorForVertex, cursorForEdgeSourceToTarget),
         skill: skill.create(cursorForVertex, cursorForEdgeSourceToTarget),
         person: person.create(cursorForVertex, cursorForEdgeSourceToTarget),
-        job: job.create(cursorForVertex, cursorForEdgeSourceToTarget),
+        occupation: occupation.create(cursorForVertex, cursorForEdgeSourceToTarget),
         dump: () => [...updates]
     })
     // TODO: convert updates to query and execute (behind an await)
