@@ -114,75 +114,64 @@ type createBuilder = {
     dump: () => ({ node: NodeLike<string> } | { edge: EdgeLike<string> })[]
 }
 
-const before = <Func extends (...args: any[]) => any>(
-    beforeFunc: (...input: Parameters<Func>) => Parameters<Func> | void
-) => (func: Func) => (...input: Parameters<Func>): ReturnType<Func> =>
-    func(beforeFunc(...input) || input)
-const after = <Func extends (...args: any[]) => any>(
-    afterFunc: (result: ReturnType<Func>) => ReturnType<Func> | void
-) => (func: Func) => (...input: Parameters<Func>): ReturnType<Func> => {
-    const result = func(input)
-    return afterFunc(result) || result
-}
-
-
 export const itPeopleDsl = (database: ReturnType<typeof createDb>) => {
 
     return {
-        create: async <OptionalOutput>(query: ($: createBuilder) => OptionalOutput) => {
-            const updates: ({ node: NodeLike<string> } | { edge: EdgeLike<string> })[] = []
-            const cursorForVertex = <VertexType extends string>(node: NodeLike<VertexType>) => <Edges>(edges: Edges): VertexFindOrCreate<VertexType, Edges> => {
-                updates.push({ node })
-                return {
-                    vertex: node,
-                    ...edges
-                }
-            }
-            const cursorForEdgeSourceToTarget = <EdgeType extends string>(edge: EdgeLike<EdgeType>) => <TargetVertexCursor>(vertexTargets: TargetVertexCursor) => {
-                updates.push({ edge })
-                return {
-                    ...vertexTargets
-                }
-            }
-            const createOutput = query({
-                company: company.create(cursorForVertex, cursorForEdgeSourceToTarget),
-                skill: skill.create(cursorForVertex, cursorForEdgeSourceToTarget),
-                person: person.create(cursorForVertex, cursorForEdgeSourceToTarget),
-                job: job.create(cursorForVertex, cursorForEdgeSourceToTarget),
-                dump: () => [...updates]
-            })
-            // TODO: convert updates to query and execute (behind an await)
-            const nodes = (<any[]>updates).map(({ node }) => node as NodeLike<string>).filter(x => x)
-            const edges = (<any[]>updates).map(({ edge }) => edge as EdgeLike<string>).filter(x => x)
-            const sql = linetrim`
-                BEGIN TRANSACTION;
-                
-                INSERT INTO nodes VALUES ${nodes.map((_, i) => `(:${i})`).join(", ")};
-                INSERT INTO edges VALUES ${edges.map((_, i) => `(:${nodes.length + i})`).join(", ")};
+        create: createActivity(database),
 
-                COMMIT TRANSACTION;
-                SELECT 1 as ok;
-            `
-            return {
-                preview: () => sql,
-                execute: async () => {
-                    const db = await database
-                    const result = db.raw(sql, ...[...nodes, ...edges].map(node => JSON.stringify(node)))
-                    return result[0][0].ok === 1
-                },
-                createOutput
-            };
-        },
-
-        find: findQueryBuilder(database, (_one, _many) => ({
-            person: () => findOneOrMany<ReturnType<ReturnType<typeof person.create>>["vertex"]>("person", _one, _many),
-            company: () => findOneOrMany<ReturnType<ReturnType<typeof company.create>>["vertex"]>("company", _one, _many),
-        })
-        )
+        find: findActivity(database, (_one, _many) => ({
+            person: () => findActivityNodeOneOrMany<ReturnType<ReturnType<typeof person.create>>["vertex"]>("person", _one, _many),
+            company: () => findActivityNodeOneOrMany<ReturnType<ReturnType<typeof company.create>>["vertex"]>("company", _one, _many),
+        }))
     }
 }
 
-const findQueryBuilder = <Domain>(database: ReturnType<typeof createDb>, queryBuilder: (one: <NodeType>(query: WhereClause<NodeType>) => any, many: <NodeType>(query: WhereClause<NodeType>) => any) => Domain): Domain => {
+const createActivity = (database: ReturnType<typeof createDb>) => async <OptionalOutput>(query: ($: createBuilder) => OptionalOutput) => {
+    const updates: ({ node: NodeLike<string> } | { edge: EdgeLike<string> })[] = []
+    const cursorForVertex = <VertexType extends string>(node: NodeLike<VertexType>) => <Edges>(edges: Edges): VertexFindOrCreate<VertexType, Edges> => {
+        updates.push({ node })
+        return {
+            vertex: node,
+            ...edges
+        }
+    }
+    const cursorForEdgeSourceToTarget = <EdgeType extends string>(edge: EdgeLike<EdgeType>) => <TargetVertexCursor>(vertexTargets: TargetVertexCursor) => {
+        updates.push({ edge })
+        return {
+            ...vertexTargets
+        }
+    }
+    const createOutput = query({
+        company: company.create(cursorForVertex, cursorForEdgeSourceToTarget),
+        skill: skill.create(cursorForVertex, cursorForEdgeSourceToTarget),
+        person: person.create(cursorForVertex, cursorForEdgeSourceToTarget),
+        job: job.create(cursorForVertex, cursorForEdgeSourceToTarget),
+        dump: () => [...updates]
+    })
+    // TODO: convert updates to query and execute (behind an await)
+    const nodes = (<any[]>updates).map(({ node }) => node as NodeLike<string>).filter(x => x)
+    const edges = (<any[]>updates).map(({ edge }) => edge as EdgeLike<string>).filter(x => x)
+    const sql = linetrim`
+        BEGIN TRANSACTION;
+        
+        INSERT INTO nodes VALUES ${nodes.map((_, i) => `(:${i})`).join(", ")};
+        INSERT INTO edges VALUES ${edges.map((_, i) => `(:${nodes.length + i})`).join(", ")};
+
+        COMMIT TRANSACTION;
+        SELECT 1 as ok;
+    `
+    return {
+        preview: () => sql,
+        execute: async () => {
+            const db = await database
+            const result = db.raw(sql, ...[...nodes, ...edges].map(node => JSON.stringify(node)))
+            return result[0][0].ok === 1
+        },
+        createOutput
+    };
+}
+
+const findActivity = <Domain>(database: ReturnType<typeof createDb>, queryBuilder: (one: <NodeType>(query: WhereClause<NodeType>) => any, many: <NodeType>(query: WhereClause<NodeType>) => any) => Domain): Domain => {
     return queryBuilder(
         oneQuery => {
             return database.then(db => [...db.searchNodes(oneQuery, { OFFSET: 0, LIMIT: 1 })][0])
@@ -193,7 +182,7 @@ const findQueryBuilder = <Domain>(database: ReturnType<typeof createDb>, queryBu
     )
 }
 
-const findOneOrMany = <VertexType extends NodeLike<string>>(databaseNodeTypeName: string, _one: <NodeType>(query: WhereClause<NodeType>) => any, _many: <NodeType>(query: WhereClause<NodeType>) => any) => ({
+const findActivityNodeOneOrMany = <VertexType extends NodeLike<string>>(databaseNodeTypeName: string, _one: <NodeType>(query: WhereClause<NodeType>) => any, _many: <NodeType>(query: WhereClause<NodeType>) => any) => ({
     one: async (idOrQuery?: string | WhereClause<VertexType>) => {
         if (idOrQuery) {
             return _one(typeof idOrQuery === "string" ? <WhereClause<VertexType>>{ id: { eq: `${databaseNodeTypeName}/${idOrQuery}` } } : idOrQuery) as VertexType
