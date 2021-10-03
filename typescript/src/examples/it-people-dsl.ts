@@ -11,8 +11,8 @@ type VertexFindOrCreate<VertexType extends string, Edges, VertexProperties exten
 
 type RawBuilder = <T extends ({ node:NodeLike<string> } | { edge:EdgeLike<string> })>(...items: T[]) => void
 
-type NodeLike<T extends string, P extends {} = {}> = { id: string, type: T } & P
-type VertexBuilder = <VertexType extends string, Properties extends {}>(node: NodeLike<VertexType, Properties>) => <Edges>(edges: Edges) => VertexFindOrCreate<VertexType, Edges, Properties>
+type NodeLike<Type extends string, P extends {} = {}> = P & { id: string, type: Type }
+type VertexBuilder = <VertexType extends string, Properties extends {} = {}>(node: NodeLike<VertexType, Properties>) => <Edges>(edges: Edges) => VertexFindOrCreate<VertexType, Edges, Properties>
 
 type EdgeLike<T extends string> = { source: string, target: string, type: T }
 type EdgeBuilder = <EdgeType extends string>(edge: EdgeLike<EdgeType>) => <TargetVertexCursor>(vertexTargets: TargetVertexCursor) => TargetVertexCursor
@@ -33,7 +33,7 @@ const nodeType = <NodeType extends string, Properties extends {} = {}, CreateEdg
             $push: RawBuilder
         ) => (
             name: string
-        ) => $vertex<NodeType, Properties>({
+        ) => $vertex<NodeType, Properties>(/* TODO: this cast is needed, but why is it? */<NodeLike<NodeType, Properties>>{
             id: `${type}/${name}`, type
         })(build ? build({ $vertex, $edge, $push }, name) : <CreateEdges>{})
     })
@@ -74,7 +74,7 @@ const person = nodeType("person", ({ $edge, $push  }, personName) => ({
         })({
             as: (
                 _occupation: EdgeType<typeof occupation>,
-                properties: VertexType<typeof job>) => {
+                properties: Omit<VertexType<typeof job>, "id" | "type">) => {
                 /**
                  * Enhanced Behaviour:
                  * In this special scenario, 'as' behaves as: 
