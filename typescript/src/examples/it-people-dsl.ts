@@ -4,15 +4,15 @@ import { linetrim, createDb, WhereClause } from "../index"
 // Base DSL
 
 type VertexFindOrCreate<VertexType extends string, Edges, VertexProperties extends {}> = {
-    vertex: NodeLike<VertexType> & VertexProperties
+    vertex: NodeLike<VertexType, VertexProperties>
 } & {
         [key in keyof Edges]: Edges[key]
     }
 
 type RawBuilder = <T extends ({ node:NodeLike<string> } | { edge:EdgeLike<string> })>(...items: T[]) => void
 
-type NodeLike<T extends string> = { id: string, type: T }
-type VertexBuilder = <VertexType extends string, Properties extends {}>(node: NodeLike<VertexType> & Properties) => <Edges>(edges: Edges) => VertexFindOrCreate<VertexType, Edges, Properties>
+type NodeLike<T extends string, P extends {} = {}> = { id: string, type: T } & P
+type VertexBuilder = <VertexType extends string, Properties extends {}>(node: NodeLike<VertexType, Properties>) => <Edges>(edges: Edges) => VertexFindOrCreate<VertexType, Edges, Properties>
 
 type EdgeLike<T extends string> = { source: string, target: string, type: T }
 type EdgeBuilder = <EdgeType extends string>(edge: EdgeLike<EdgeType>) => <TargetVertexCursor>(vertexTargets: TargetVertexCursor) => TargetVertexCursor
