@@ -9,6 +9,8 @@ type VertexFindOrCreate<VertexType extends string, Edges> = {
         [key in keyof Edges]: Edges[key]
     }
 
+type RawBuilder = <T extends (NodeLike<string> | EdgeLike<string>)>(...items: T[]) => number
+
 type NodeLike<T extends string> = { id: string, type: T }
 type VertexBuilder = <VertexType extends string>(node: NodeLike<VertexType>) => <Edges>(edges: Edges) => VertexFindOrCreate<VertexType, Edges>
 
@@ -16,22 +18,24 @@ type EdgeLike<T extends string> = { source: string, target: string, type: T }
 type EdgeBuilder = <EdgeType extends string>(edge: EdgeLike<EdgeType>) => <TargetVertexCursor>(vertexTargets: TargetVertexCursor) => TargetVertexCursor
 
 const nodeType = <NodeType extends string, CreateEdges = {}>(type: NodeType, build?: (
-    builders: { $vertex: VertexBuilder, $edge: EdgeBuilder }, sourceName: string) => CreateEdges): {
+    builders: { $vertex: VertexBuilder, $edge: EdgeBuilder, $push: RawBuilder }, sourceName: string) => CreateEdges): {
         create: (
             $vertex: VertexBuilder,
-            $edge: EdgeBuilder
+            $edge: EdgeBuilder,
+            $push: RawBuilder
         ) => (
                 name: string
             ) => VertexFindOrCreate<NodeType, CreateEdges>;
     } => ({
         create: (
             $vertex: VertexBuilder,
-            $edge: EdgeBuilder
+            $edge: EdgeBuilder,
+            $push: RawBuilder
         ) => (
             name: string
         ) => $vertex<NodeType>({
             id: `${type}/${name}`, type
-        })(build ? build({ $vertex, $edge }, name) : <CreateEdges>{})
+        })(build ? build({ $vertex, $edge, $push }, name) : <CreateEdges>{})
     })
 
 
@@ -53,7 +57,7 @@ const occupation = nodeType("occupation", ({ $edge }, occupationName) => ({
         })({})
     }
 }))
-const person = nodeType("person", ({ $edge, $vertex }, personName) => ({
+const person = nodeType("person", ({ $edge, $push  }, personName) => ({
     /* contextual edges */
     that: {
         worksAt: (
@@ -71,16 +75,29 @@ const person = nodeType("person", ({ $edge, $vertex }, personName) => ({
             as: (
                 _occupation: EdgeType<typeof occupation>,
                 properties: {
-                    //                         
+                    // TODO: make properties an Omit<VertexType<typeof job>, "id" | "type"> such that this 'as' operation creates complexity
                 }) => {
-                // TODO: what do we do here?
+                /**
+                 * Enhanced Behaviour:
+                 * In this special scenario, 'as' behaves as: 
+                 * 
+                 *     person->>worksAt->company->as->>occupation(
+                 *         occupation->>includesJob->job,
+                 *         person->>hasJob->job,
+                 *         person->>worksAs->occupation
+                 *     )
+                 * 
+                 * ...such that edges are created opaquely
+                 */
+                // 0. create a job that looks alike the occupation
+                const _jobId = `job/${_occupation.vertex.id.split("/")[1]}`
+                $push(<VertexType<typeof job>>{ id: _jobId, type: "job" })
                 // 1. connect the occupation to a job vert (occupation>>-includesJob->job->isWithinOccupation->>occupation)
-                const _job = $vertex(<VertexType<typeof job>>{ id: `job/${_occupation.vertex.id.split("/")[1]}`, type: "job" })({})
-                $edge({ source: _occupation.vertex.id, target: _job.vertex.id, type: "includesJob" })({})
+                $push({ source: _occupation.vertex.id, target: _jobId, type: "includesJob" })
                 // 2. connect the person to the job vert (person>>-hasJob->job->workedBy->>person)
-                $edge({ source:  `person/${personName}`, target: _job.vertex.id, type: "hasJob" })({})
+                $push({ source:  `person/${personName}`, target: _jobId, type: "hasJob" })
                 // 3. connect the person to the occupation vert (person>>-worksAs->occupation->doneBy->>person)
-                $edge({ source:  `person/${personName}`, target: _occupation.vertex.id, type: "worksAs" })({})
+                $push({ source:  `person/${personName}`, target: _occupation.vertex.id, type: "worksAs" })
                 return _occupation
             }
         }),
@@ -139,10 +156,10 @@ const createActivity = (database: ReturnType<typeof createDb>) => async <Optiona
         }
     }
     const createOutput = query({
-        company: company.create($vertex, $edge),
-        skill: skill.create($vertex, $edge),
-        person: person.create($vertex, $edge),
-        occupation: occupation.create($vertex, $edge),
+        company: company.create($vertex, $edge, <RawBuilder>$push),
+        skill: skill.create($vertex, $edge, <RawBuilder>$push),
+        person: person.create($vertex, $edge, <RawBuilder>$push),
+        occupation: occupation.create($vertex, $edge, <RawBuilder>$push),
         dump: () => [...updates]
     })
     // TODO: convert updates to query and execute (behind an await)
