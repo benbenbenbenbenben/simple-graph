@@ -9,7 +9,7 @@ type VertexFindOrCreate<VertexType extends string, Edges> = {
         [key in keyof Edges]: Edges[key]
     }
 
-type RawBuilder = <T extends (NodeLike<string> | EdgeLike<string>)>(...items: T[]) => number
+type RawBuilder = <T extends ({ node:NodeLike<string> } | { edge:EdgeLike<string> })>(...items: T[]) => void
 
 type NodeLike<T extends string> = { id: string, type: T }
 type VertexBuilder = <VertexType extends string>(node: NodeLike<VertexType>) => <Edges>(edges: Edges) => VertexFindOrCreate<VertexType, Edges>
@@ -91,13 +91,13 @@ const person = nodeType("person", ({ $edge, $push  }, personName) => ({
                  */
                 // 0. create a job that looks alike the occupation
                 const _jobId = `job/${_occupation.vertex.id.split("/")[1]}`
-                $push(<VertexType<typeof job>>{ id: _jobId, type: "job" })
+                $push({ node: <VertexType<typeof job>>{ id: _jobId, type: "job" } })
                 // 1. connect the occupation to a job vert (occupation>>-includesJob->job->isWithinOccupation->>occupation)
-                $push({ source: _occupation.vertex.id, target: _jobId, type: "includesJob" })
+                $push({ edge: { source: _occupation.vertex.id, target: _jobId, type: "includesJob" } })
                 // 2. connect the person to the job vert (person>>-hasJob->job->workedBy->>person)
-                $push({ source:  `person/${personName}`, target: _jobId, type: "hasJob" })
+                $push({ edge: { source:  `person/${personName}`, target: _jobId, type: "hasJob" } })
                 // 3. connect the person to the occupation vert (person>>-worksAs->occupation->doneBy->>person)
-                $push({ source:  `person/${personName}`, target: _occupation.vertex.id, type: "worksAs" })
+                $push({ edge: { source:  `person/${personName}`, target: _occupation.vertex.id, type: "worksAs" } })
                 return _occupation
             }
         }),
@@ -140,8 +140,15 @@ export const itPeopleDsl = (database: ReturnType<typeof createDb>) => {
 }
 
 const createActivity = (database: ReturnType<typeof createDb>) => async <OptionalOutput>(query: ($: createBuilder) => OptionalOutput) => {
+    // TODO: encapsulate as type, updatesString and updates are in sync
+    const updatesStrings: string[] = []
     const updates: ({ node: NodeLike<string> } | { edge: EdgeLike<string> })[] = []
-    const $push = updates.push.bind(updates)
+    const $push:RawBuilder = (...items) => {
+        // TODO: warn of duplicated pushes
+        const itemsToPush = items.filter(item => !updatesStrings.includes(JSON.stringify(item)))
+        updates.push(...itemsToPush)
+        updatesStrings.push(...itemsToPush.map(item => JSON.stringify(item)))
+    }
     const $vertex = <VertexType extends string>(node: NodeLike<VertexType>) => <Edges>(edges: Edges): VertexFindOrCreate<VertexType, Edges> => {
         $push({ node })
         return {
