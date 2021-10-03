@@ -10,49 +10,50 @@ type VertexFindOrCreate<VertexType extends string, Edges> = {
     }
 
 type NodeLike<T extends string> = { id: string, type: T }
-type CursorForVertex = <VertexType extends string>(node: NodeLike<VertexType>) => <Edges>(edges: Edges) => VertexFindOrCreate<VertexType, Edges>
+type VertexBuilder = <VertexType extends string>(node: NodeLike<VertexType>) => <Edges>(edges: Edges) => VertexFindOrCreate<VertexType, Edges>
 
 type EdgeLike<T extends string> = { source: string, target: string, type: T }
-type CursorForEdgeSourceToTarget = <EdgeType extends string>(edge: EdgeLike<EdgeType>) => <TargetVertexCursor>(vertexTargets: TargetVertexCursor) => TargetVertexCursor
+type EdgeBuilder = <EdgeType extends string>(edge: EdgeLike<EdgeType>) => <TargetVertexCursor>(vertexTargets: TargetVertexCursor) => TargetVertexCursor
 
-const nodeType = <NodeType extends string, CreateEdges = {}>(type: NodeType, createEdges?: (
-    withEdge: CursorForEdgeSourceToTarget, sourceName: string) => CreateEdges): {
+const nodeType = <NodeType extends string, CreateEdges = {}>(type: NodeType, build?: (
+    builders: { $vertex: VertexBuilder, $edge: EdgeBuilder }, sourceName: string) => CreateEdges): {
         create: (
-            cursorForVertex: CursorForVertex,
-            withEdge: CursorForEdgeSourceToTarget
+            $vertex: VertexBuilder,
+            $edge: EdgeBuilder
         ) => (
                 name: string
             ) => VertexFindOrCreate<NodeType, CreateEdges>;
     } => ({
         create: (
-            cursorForVertex: CursorForVertex,
-            withEdge: CursorForEdgeSourceToTarget
+            $vertex: VertexBuilder,
+            $edge: EdgeBuilder
         ) => (
             name: string
-        ) => cursorForVertex<NodeType>({
+        ) => $vertex<NodeType>({
             id: `${type}/${name}`, type
-        })(createEdges ? createEdges(withEdge, name) : <CreateEdges>{})
+        })(build ? build({ $vertex, $edge }, name) : <CreateEdges>{})
     })
 
 
 type EdgeType<T extends { create: any }> = ReturnType<ReturnType<T["create"]>>
+type VertexType<T extends { create: any }> = ReturnType<ReturnType<T["create"]>>["vertex"]
 
 // IT People DSL
 const job = nodeType("job")
 const company = nodeType("company")
 const skill = nodeType("skill")
-const occupation = nodeType("occupation", (withEdge, occupationName) => ({
+const occupation = nodeType("occupation", ({ $edge }, occupationName) => ({
     that: {
         mayRequire: (
             _skill: EdgeType<typeof skill>
-        ) => withEdge({
+        ) => $edge({
             type: "mayRequire",
             source: `occupation/${occupationName}`,
             target: _skill.vertex.id
         })({})
     }
 }))
-const person = nodeType("person", (withEdge: CursorForEdgeSourceToTarget, personName: string) => ({
+const person = nodeType("person", ({ $edge, $vertex }, personName) => ({
     /* contextual edges */
     that: {
         worksAt: (
@@ -62,7 +63,7 @@ const person = nodeType("person", (withEdge: CursorForEdgeSourceToTarget, person
                 ending?: DateTime,
                 fulltime?: boolean,
             }
-        ) => withEdge({
+        ) => $edge({
             type: "worksAt", ...properties,
             source: `person/${personName}`,
             target: _company.vertex.id
@@ -74,14 +75,18 @@ const person = nodeType("person", (withEdge: CursorForEdgeSourceToTarget, person
                 }) => {
                 // TODO: what do we do here?
                 // 1. connect the occupation to a job vert (occupation>>-includesJob->job->isWithinOccupation->>occupation)
+                const _job = $vertex(<VertexType<typeof job>>{ id: `job/${_occupation.vertex.id.split("/")[1]}`, type: "job" })({})
+                $edge({ source: _occupation.vertex.id, target: _job.vertex.id, type: "includesJob" })({})
                 // 2. connect the person to the job vert (person>>-hasJob->job->workedBy->>person)
-                // 3. connect the person to the occupation vert (person>>-worksAs->occupation->doneBy->>person) 
+                $edge({ source:  `person/${personName}`, target: _job.vertex.id, type: "hasJob" })({})
+                // 3. connect the person to the occupation vert (person>>-worksAs->occupation->doneBy->>person)
+                $edge({ source:  `person/${personName}`, target: _occupation.vertex.id, type: "worksAs" })({})
                 return _occupation
             }
         }),
         usesTheSkill: (
             _skill: EdgeType<typeof skill>
-        ) => withEdge<"usesTheSkill">({
+        ) => $edge<"usesTheSkill">({
             type: "usesTheSkill",
             source: `person/${personName}`,
             target: _skill.vertex.id
@@ -119,24 +124,25 @@ export const itPeopleDsl = (database: ReturnType<typeof createDb>) => {
 
 const createActivity = (database: ReturnType<typeof createDb>) => async <OptionalOutput>(query: ($: createBuilder) => OptionalOutput) => {
     const updates: ({ node: NodeLike<string> } | { edge: EdgeLike<string> })[] = []
-    const cursorForVertex = <VertexType extends string>(node: NodeLike<VertexType>) => <Edges>(edges: Edges): VertexFindOrCreate<VertexType, Edges> => {
-        updates.push({ node })
+    const $push = updates.push.bind(updates)
+    const $vertex = <VertexType extends string>(node: NodeLike<VertexType>) => <Edges>(edges: Edges): VertexFindOrCreate<VertexType, Edges> => {
+        $push({ node })
         return {
             vertex: node,
             ...edges
         }
     }
-    const cursorForEdgeSourceToTarget = <EdgeType extends string>(edge: EdgeLike<EdgeType>) => <TargetVertexCursor>(vertexTargets: TargetVertexCursor) => {
-        updates.push({ edge })
+    const $edge = <EdgeType extends string>(edge: EdgeLike<EdgeType>) => <TargetVertexCursor>(vertexTargets: TargetVertexCursor) => {
+        $push({ edge })
         return {
             ...vertexTargets
         }
     }
     const createOutput = query({
-        company: company.create(cursorForVertex, cursorForEdgeSourceToTarget),
-        skill: skill.create(cursorForVertex, cursorForEdgeSourceToTarget),
-        person: person.create(cursorForVertex, cursorForEdgeSourceToTarget),
-        occupation: occupation.create(cursorForVertex, cursorForEdgeSourceToTarget),
+        company: company.create($vertex, $edge),
+        skill: skill.create($vertex, $edge),
+        person: person.create($vertex, $edge),
+        occupation: occupation.create($vertex, $edge),
         dump: () => [...updates]
     })
     // TODO: convert updates to query and execute (behind an await)
