@@ -3,8 +3,8 @@ import { linetrim, createDb, WhereClause } from "../index"
 
 // Base DSL
 
-type VertexFindOrCreate<VertexType extends string, Edges> = {
-    vertex: NodeLike<VertexType>
+type VertexFindOrCreate<VertexType extends string, Edges, VertexProperties extends {}> = {
+    vertex: NodeLike<VertexType> & VertexProperties
 } & {
         [key in keyof Edges]: Edges[key]
     }
@@ -12,12 +12,12 @@ type VertexFindOrCreate<VertexType extends string, Edges> = {
 type RawBuilder = <T extends ({ node:NodeLike<string> } | { edge:EdgeLike<string> })>(...items: T[]) => void
 
 type NodeLike<T extends string> = { id: string, type: T }
-type VertexBuilder = <VertexType extends string>(node: NodeLike<VertexType>) => <Edges>(edges: Edges) => VertexFindOrCreate<VertexType, Edges>
+type VertexBuilder = <VertexType extends string, Properties extends {}>(node: NodeLike<VertexType> & Properties) => <Edges>(edges: Edges) => VertexFindOrCreate<VertexType, Edges, Properties>
 
 type EdgeLike<T extends string> = { source: string, target: string, type: T }
 type EdgeBuilder = <EdgeType extends string>(edge: EdgeLike<EdgeType>) => <TargetVertexCursor>(vertexTargets: TargetVertexCursor) => TargetVertexCursor
 
-const nodeType = <NodeType extends string, CreateEdges = {}>(type: NodeType, build?: (
+const nodeType = <NodeType extends string, Properties extends {} = {}, CreateEdges = {}>(type: NodeType, build?: (
     builders: { $vertex: VertexBuilder, $edge: EdgeBuilder, $push: RawBuilder }, sourceName: string) => CreateEdges): {
         create: (
             $vertex: VertexBuilder,
@@ -25,7 +25,7 @@ const nodeType = <NodeType extends string, CreateEdges = {}>(type: NodeType, bui
             $push: RawBuilder
         ) => (
                 name: string
-            ) => VertexFindOrCreate<NodeType, CreateEdges>;
+            ) => VertexFindOrCreate<NodeType, CreateEdges, Properties>;
     } => ({
         create: (
             $vertex: VertexBuilder,
@@ -33,7 +33,7 @@ const nodeType = <NodeType extends string, CreateEdges = {}>(type: NodeType, bui
             $push: RawBuilder
         ) => (
             name: string
-        ) => $vertex<NodeType>({
+        ) => $vertex<NodeType, Properties>({
             id: `${type}/${name}`, type
         })(build ? build({ $vertex, $edge, $push }, name) : <CreateEdges>{})
     })
@@ -43,7 +43,7 @@ type EdgeType<T extends { create: any }> = ReturnType<ReturnType<T["create"]>>
 type VertexType<T extends { create: any }> = ReturnType<ReturnType<T["create"]>>["vertex"]
 
 // IT People DSL
-const job = nodeType("job")
+const job = nodeType<"job", { level: "junior" | "mid" | "senior" | "principal" }>("job")
 const company = nodeType("company")
 const skill = nodeType("skill")
 const occupation = nodeType("occupation", ({ $edge }, occupationName) => ({
@@ -74,9 +74,7 @@ const person = nodeType("person", ({ $edge, $push  }, personName) => ({
         })({
             as: (
                 _occupation: EdgeType<typeof occupation>,
-                properties: {
-                    // TODO: make properties an Omit<VertexType<typeof job>, "id" | "type"> such that this 'as' operation creates complexity
-                }) => {
+                properties: VertexType<typeof job>) => {
                 /**
                  * Enhanced Behaviour:
                  * In this special scenario, 'as' behaves as: 
@@ -149,7 +147,7 @@ const createActivity = (database: ReturnType<typeof createDb>) => async <Optiona
         updates.push(...itemsToPush)
         updatesStrings.push(...itemsToPush.map(item => JSON.stringify(item)))
     }
-    const $vertex = <VertexType extends string>(node: NodeLike<VertexType>) => <Edges>(edges: Edges): VertexFindOrCreate<VertexType, Edges> => {
+    const $vertex = <VertexType extends string, Properties extends {}>(node: NodeLike<VertexType> & Properties) => <Edges>(edges: Edges): VertexFindOrCreate<VertexType, Edges, Properties> => {
         $push({ node })
         return {
             vertex: node,

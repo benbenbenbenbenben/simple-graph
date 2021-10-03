@@ -29,7 +29,7 @@ describe("it-people-dsl", () => {
             const { that: JoeBloggsIsAPersonThat } = JoeBloggs
 
             // the "as" operation is an example of an edge-like API that adds complex edges opaquely
-            JoeBloggsIsAPersonThat.worksAt(AcmeInc, { beginning: worksAtAcmeBeginning }).as(SoftwareDeveloper, { level: "senior" })
+            JoeBloggsIsAPersonThat.worksAt(AcmeInc, { beginning: worksAtAcmeBeginning }).as(SoftwareDeveloper, { level: "" })
             JoeBloggsIsAPersonThat.usesTheSkill(TypeScript).at(AcmeInc)
             JoeBloggsIsAPersonThat.usesTheSkill(Python).at(AcmeInc)
             JoeBloggsIsAPersonThat.usesTheSkill(AgileMethodologies).at(AcmeInc)
