@@ -1,5 +1,20 @@
 # About
 
+```TypeScript
+const grafluent = $.openSourceProject(
+  "Grafluent" {
+    by: "Benjamin Babik" }
+).isForkedFrom(
+  "simple-graph", { 
+    by: "Denis Papathanasiou" }
+).and.isInspiredBy(
+  { "SQLite as a document database": { 
+    blog: "https://dgl.cx/2020/06/sqlite-json-support" } },
+  { "JanusGraph": {
+    }}
+)
+```
+
 This is a simple [graph database](https://en.wikipedia.org/wiki/Graph_database) in [SQLite](https://www.sqlite.org/), inspired by "[SQLite as a document database](https://dgl.cx/2020/06/sqlite-json-support)".
 
 # Structure
