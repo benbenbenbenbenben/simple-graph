@@ -3,7 +3,7 @@ import { linetrim, createDb, WhereClause } from "../index"
 
 // Base DSL
 
-type VertexFindOrCreate<VertexType extends string, Edges, VertexProperties extends {}> = {
+type VertexFindOrCreate<VertexType extends string, Edges, VertexProperties extends Record<string, unknown>> = {
     vertex: NodeLike<VertexType, VertexProperties>
 } & {
         [key in keyof Edges]: Edges[key]
@@ -11,13 +11,13 @@ type VertexFindOrCreate<VertexType extends string, Edges, VertexProperties exten
 
 type RawBuilder = <T extends ({ node:NodeLike<string> } | { edge:EdgeLike<string> })>(...items: T[]) => void
 
-type NodeLike<Type extends string, P extends {} = {}> = P & { id: string, type: Type }
-type VertexBuilder = <VertexType extends string, Properties extends {} = {}>(node: NodeLike<VertexType, Properties>) => <Edges>(edges: Edges) => VertexFindOrCreate<VertexType, Edges, Properties>
+type NodeLike<Type extends string, P extends Record<string, unknown> = Record<string, unknown>> = P & { id: string, type: Type }
+type VertexBuilder = <VertexType extends string, Properties extends Record<string, unknown> = Record<string, unknown>>(node: NodeLike<VertexType, Properties>) => <Edges>(edges: Edges) => VertexFindOrCreate<VertexType, Edges, Properties>
 
 type EdgeLike<T extends string> = { source: string, target: string, type: T }
 type EdgeBuilder = <EdgeType extends string>(edge: EdgeLike<EdgeType>) => <TargetVertexCursor>(vertexTargets: TargetVertexCursor) => TargetVertexCursor
 
-const nodeType = <NodeType extends string, Properties extends {} = {}, CreateEdges = {}>(type: NodeType, build?: (
+const nodeType = <NodeType extends string, Properties extends Record<string, unknown> = Record<string, unknown>, CreateEdges = Record<string, unknown>>(type: NodeType, build?: (
     builders: { $vertex: VertexBuilder, $edge: EdgeBuilder, $push: RawBuilder }, sourceName: string) => CreateEdges): {
         create: (
             $vertex: VertexBuilder,
@@ -39,8 +39,8 @@ const nodeType = <NodeType extends string, Properties extends {} = {}, CreateEdg
     })
 
 
-type EdgeType<T extends { create: any }> = ReturnType<ReturnType<T["create"]>>
-type VertexType<T extends { create: any }> = ReturnType<ReturnType<T["create"]>>["vertex"]
+type EdgeType<T extends { create: (...args:never[]) => (...args:never[]) => unknown }> = ReturnType<ReturnType<T["create"]>>
+type VertexType<T extends { create: (...args:never[]) => (...args:never[]) => { vertex:NodeLike<string> } }> = ReturnType<ReturnType<T["create"]>>["vertex"]
 
 // IT People DSL
 const job = nodeType<"job", { level: "junior" | "mid" | "senior" | "principal" }>("job")
@@ -89,7 +89,7 @@ const person = nodeType("person", ({ $edge, $push  }, personName) => ({
                  */
                 // 0. create a job that looks alike the occupation
                 const _jobId = `job/${_occupation.vertex.id.split("/")[1]}`
-                $push({ node: <VertexType<typeof job>>{ id: _jobId, type: "job" } })
+                $push({ node: <VertexType<typeof job>>{ id: _jobId, type: "job", ...properties } })
                 // 1. connect the occupation to a job vert (occupation>>-includesJob->job->isWithinOccupation->>occupation)
                 $push({ edge: { source: _occupation.vertex.id, target: _jobId, type: "includesJob" } })
                 // 2. connect the person to the job vert (person>>-hasJob->job->workedBy->>person)
@@ -125,6 +125,7 @@ type createBuilder = {
     dump: () => ({ node: NodeLike<string> } | { edge: EdgeLike<string> })[]
 }
 
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export const itPeopleDsl = (database: ReturnType<typeof createDb>) => {
 
     return {
@@ -168,8 +169,8 @@ const createActivity = (database: ReturnType<typeof createDb>) => async <Optiona
         dump: () => [...updates]
     })
     // TODO: convert updates to query and execute (behind an await)
-    const nodes = (<any[]>updates).map(({ node }) => node as NodeLike<string>).filter(x => x)
-    const edges = (<any[]>updates).map(({ edge }) => edge as EdgeLike<string>).filter(x => x)
+    const nodes = (<never[]>updates).map(({ node }) => node as NodeLike<string>).filter(x => x)
+    const edges = (<never[]>updates).map(({ edge }) => edge as EdgeLike<string>).filter(x => x)
     const sql = linetrim`
         BEGIN TRANSACTION;
         
@@ -210,6 +211,6 @@ const findActivityNodeOneOrMany = <VertexType extends NodeLike<string>>(database
         }
     },
     many: async (query = <WhereClause<VertexType>>{ type: { eq: databaseNodeTypeName } }) => {
-        return _many(query) as any as VertexType[]
+        return _many(query) as VertexType[]
     }
 })

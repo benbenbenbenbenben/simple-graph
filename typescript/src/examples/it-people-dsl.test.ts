@@ -59,7 +59,7 @@ describe("it-people-dsl", () => {
             // edges
             { edge: { source: "person/Joe Bloggs", target: "company/Acme Inc.", type: "worksAt", beginning: worksAtAcmeBeginning } },
             // these records are created by 'as' on the 'worksAt' API
-            { node: { id: "job/Software Developer", type: "job" } },
+            { node: { id: "job/Software Developer", type: "job", level: "senior" } },
             { edge: { source: "occupation/Software Developer", target: "job/Software Developer", type: "includesJob" } },
             { edge: { source: "person/Joe Bloggs", target: "job/Software Developer", type: "hasJob" } },
             { edge: { source: "person/Joe Bloggs", target: "occupation/Software Developer", type: "worksAs" } },
@@ -70,6 +70,7 @@ describe("it-people-dsl", () => {
             // extra
             { node: { id: "company/Widget Factory", type: "company" } },
             { edge: { source: "person/Joe Bloggs", target: "company/Widget Factory", type: "worksAt", beginning: worksAtWidgetFactoryBeginning, ending: worksAtWidgetFactoryEnding } },
+            { node: { id: "job/Software Developer", type: "job", level: "mid" } },
             { edge: { source: "occupation/Software Developer", target: "skill/Agile", type: "mayRequire" } }
         ])
 
@@ -77,8 +78,8 @@ describe("it-people-dsl", () => {
         expect(joeBloggsGraph.preview()).toBe(linetrim`
             BEGIN TRANSACTION;
 
-            INSERT INTO nodes VALUES (:0), (:1), (:2), (:3), (:4), (:5), (:6), (:7);
-            INSERT INTO edges VALUES (:8), (:9), (:10), (:11), (:12), (:13), (:14), (:15), (:16);
+            INSERT INTO nodes VALUES (:0), (:1), (:2), (:3), (:4), (:5), (:6), (:7), (:8);
+            INSERT INTO edges VALUES (:9), (:10), (:11), (:12), (:13), (:14), (:15), (:16), (:17);
 
             COMMIT TRANSACTION;
             SELECT 1 as ok;
