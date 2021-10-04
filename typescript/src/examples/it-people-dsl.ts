@@ -9,7 +9,7 @@ type VertexFindOrCreate<VertexType extends string, Edges, VertexProperties exten
         [key in keyof Edges]: Edges[key]
     }
 
-type RawBuilder = <T extends ({ node:NodeLike<string> } | { edge:EdgeLike<string> })>(...items: T[]) => void
+type RawBuilder = <T extends ({ node: NodeLike<string> } | { edge: EdgeLike<string> }) >(...items: T[]) => void
 
 type NodeLike<Type extends string, P extends Record<string, unknown> = Record<string, unknown>> = P & { id: string, type: Type }
 type VertexBuilder = <VertexType extends string, Properties extends Record<string, unknown> = Record<string, unknown>>(node: NodeLike<VertexType, Properties>) => <Edges>(edges: Edges) => VertexFindOrCreate<VertexType, Edges, Properties>
@@ -39,8 +39,8 @@ const nodeType = <NodeType extends string, Properties extends Record<string, unk
     })
 
 
-type EdgeType<T extends { create: (...args:never[]) => (...args:never[]) => unknown }> = ReturnType<ReturnType<T["create"]>>
-type VertexType<T extends { create: (...args:never[]) => (...args:never[]) => { vertex:NodeLike<string> } }> = ReturnType<ReturnType<T["create"]>>["vertex"]
+type EdgeType<T extends { create: (...args: never[]) => (...args: never[]) => unknown }> = ReturnType<ReturnType<T["create"]>>
+type VertexType<T extends { create: (...args: never[]) => (...args: never[]) => { vertex: NodeLike<string> } }> = ReturnType<ReturnType<T["create"]>>["vertex"]
 
 // IT People DSL
 const job = nodeType<"job", { level: "junior" | "mid" | "senior" | "principal" }>("job")
@@ -57,7 +57,7 @@ const occupation = nodeType("occupation", ({ $edge }, occupationName) => ({
         })({})
     }
 }))
-const person = nodeType("person", ({ $edge, $push  }, personName) => ({
+const person = nodeType("person", ({ $edge, $push }, personName) => ({
     /* contextual edges */
     that: {
         worksAt: (
@@ -82,20 +82,29 @@ const person = nodeType("person", ({ $edge, $push  }, personName) => ({
                  *     person->>worksAt->company->as->>occupation(
                  *         occupation->>includesJob->job,
                  *         person->>hasJob->job,
-                 *         person->>worksAs->occupation
+                 *         person->>worksAs->occupation,
+                 *         job->>isPerformedFor->company
                  *     )
                  * 
                  * ...such that edges are created opaquely
                  */
-                // 0. create a job that looks alike the occupation
-                const _jobId = `job/${_occupation.vertex.id.split("/")[1]}`
+                // 0. create a job that looks alike the occupation - we create a deterministic id for this specific job
+                const hash = objectHash({
+                    person: `person/${personName}`,
+                    job: _occupation.vertex.id,
+                    company: _company.vertex.id,
+                    properties
+                })
+                const _jobId = `job/#${hash}`
                 $push({ node: <VertexType<typeof job>>{ id: _jobId, type: "job", ...properties } })
                 // 1. connect the occupation to a job vert (occupation>>-includesJob->job->isWithinOccupation->>occupation)
                 $push({ edge: { source: _occupation.vertex.id, target: _jobId, type: "includesJob" } })
                 // 2. connect the person to the job vert (person>>-hasJob->job->workedBy->>person)
-                $push({ edge: { source:  `person/${personName}`, target: _jobId, type: "hasJob" } })
+                $push({ edge: { source: `person/${personName}`, target: _jobId, type: "hasJob" } })
                 // 3. connect the person to the occupation vert (person>>-worksAs->occupation->doneBy->>person)
-                $push({ edge: { source:  `person/${personName}`, target: _occupation.vertex.id, type: "worksAs" } })
+                $push({ edge: { source: `person/${personName}`, target: _occupation.vertex.id, type: "worksAs" } })
+                // 4. connect job to company ver (job->>isPerformedFor->company)
+                $push({ edge: { source: _jobId, target: _company.vertex.id, type: "isPerformedFor" } })
                 return _occupation
             }
         }),
@@ -142,7 +151,7 @@ const createActivity = (database: ReturnType<typeof createDb>) => async <Optiona
     // TODO: encapsulate as type, updatesString and updates are in sync
     const updatesStrings: string[] = []
     const updates: ({ node: NodeLike<string> } | { edge: EdgeLike<string> })[] = []
-    const $push:RawBuilder = (...items) => {
+    const $push: RawBuilder = (...items) => {
         // TODO: warn of duplicated pushes
         const itemsToPush = items.filter(item => !updatesStrings.includes(JSON.stringify(item)))
         updates.push(...itemsToPush)
@@ -214,3 +223,13 @@ const findActivityNodeOneOrMany = <VertexType extends NodeLike<string>>(database
         return _many(query) as VertexType[]
     }
 })
+
+export const objectHash = (obj: unknown): number => {
+    const str = JSON.stringify(obj)
+    let hash = 0
+	for (let i = 0; i < str.length; i++) {
+		hash += Math.pow(str.charCodeAt(i) * 31, str.length - i)
+		hash = hash & hash
+	}
+	return hash
+}
