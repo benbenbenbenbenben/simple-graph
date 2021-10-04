@@ -4,20 +4,20 @@ import { linetrim, createDb, WhereClause } from "../index"
 // Base DSL
 
 type VertexFindOrCreate<VertexType extends string, Edges, VertexProperties extends Record<string, unknown>> = {
-    vertex: NodeLike<VertexType, VertexProperties>
+    vertex: VertexLike<VertexType, VertexProperties>
 } & {
         [key in keyof Edges]: Edges[key]
     }
 
-type RawBuilder = <T extends ({ node: NodeLike<string> } | { edge: EdgeLike<string> }) >(...items: T[]) => void
+type RawBuilder = <T extends ({ vertex: VertexLike<string> } | { edge: EdgeLike<string> }) >(...items: T[]) => void
 
-type NodeLike<Type extends string, P extends Record<string, unknown> = Record<string, unknown>> = P & { id: string, type: Type, name: string }
-type VertexBuilder = <VertexType extends string, Properties extends Record<string, unknown> = Record<string, unknown>>(node: NodeLike<VertexType, Properties>) => <Edges>(edges: Edges) => VertexFindOrCreate<VertexType, Edges, Properties>
+type VertexLike<Type extends string, P extends Record<string, unknown> = Record<string, unknown>> = P & { id: string, type: Type, name: string }
+type VertexBuilder = <VertexType extends string, Properties extends Record<string, unknown> = Record<string, unknown>>(node: VertexLike<VertexType, Properties>) => <Edges>(edges: Edges) => VertexFindOrCreate<VertexType, Edges, Properties>
 
 type EdgeLike<T extends string> = { source: string, target: string, type: T }
 type EdgeBuilder = <EdgeType extends string>(edge: EdgeLike<EdgeType>) => <TargetVertexCursor>(vertexTargets: TargetVertexCursor) => TargetVertexCursor
 
-const nodeType = <NodeType extends string, Properties extends Record<string, unknown> = Record<string, unknown>, CreateEdges = Record<string, unknown>>(type: NodeType, build?: (
+const addVertex = <VertexType extends string, Properties extends Record<string, unknown> = Record<string, unknown>, CreateEdges = Record<string, unknown>>(type: VertexType, build?: (
     builders: { $vertex: VertexBuilder, $edge: EdgeBuilder, $push: RawBuilder }, sourceName: string) => CreateEdges): {
         create: (
             $vertex: VertexBuilder,
@@ -25,7 +25,7 @@ const nodeType = <NodeType extends string, Properties extends Record<string, unk
             $push: RawBuilder
         ) => (
                 name: string
-            ) => VertexFindOrCreate<NodeType, CreateEdges, Properties>;
+            ) => VertexFindOrCreate<VertexType, CreateEdges, Properties>;
     } => ({
         create: (
             $vertex: VertexBuilder,
@@ -33,14 +33,14 @@ const nodeType = <NodeType extends string, Properties extends Record<string, unk
             $push: RawBuilder
         ) => (
             name: string
-        ) => $vertex<NodeType, Properties>(/* TODO: this cast is needed, but why is it? */<NodeLike<NodeType, Properties>>{
+        ) => $vertex<VertexType, Properties>(/* TODO: this cast is needed, but why is it? */<VertexLike<VertexType, Properties>>{
             id: `${type}/${name}`, name, type
         })(build ? build({ $vertex, $edge, $push }, name) : <CreateEdges>{})
     })
 
 
 type EdgeType<T extends { create: (...args: never[]) => (...args: never[]) => unknown }> = ReturnType<ReturnType<T["create"]>>
-type VertexType<T extends { create: (...args: never[]) => (...args: never[]) => { vertex: NodeLike<string> } }> = ReturnType<ReturnType<T["create"]>>["vertex"]
+type VertexType<T extends { create: (...args: never[]) => (...args: never[]) => { vertex: VertexLike<string> } }> = ReturnType<ReturnType<T["create"]>>["vertex"]
 
 
 
@@ -50,10 +50,10 @@ type VertexType<T extends { create: (...args: never[]) => (...args: never[]) => 
 
 
 // IT People DSL
-const job = nodeType<"job", { level: "junior" | "mid" | "senior" | "principal" }>("job")
-const company = nodeType("company")
-const skill = nodeType("skill")
-const occupation = nodeType("occupation", ({ $edge }, occupationName) => ({
+const job = addVertex<"job", { level: "junior" | "mid" | "senior" | "principal" }>("job")
+const company = addVertex("company")
+const skill = addVertex("skill")
+const occupation = addVertex("occupation", ({ $edge }, occupationName) => ({
     that: {
         mayRequire: (
             _skill: EdgeType<typeof skill>
@@ -64,7 +64,7 @@ const occupation = nodeType("occupation", ({ $edge }, occupationName) => ({
         })({})
     }
 }))
-const person = nodeType("person", ({ $edge, $push }, personName) => ({
+const person = addVertex("person", ({ $edge, $push }, personName) => ({
     /* contextual edges */
     that: {
         worksAt: (
@@ -103,7 +103,7 @@ const person = nodeType("person", ({ $edge, $push }, personName) => ({
                     properties
                 })
                 const _jobId = `job/#${hash}`
-                $push({ node: <VertexType<typeof job>>{ id: _jobId, type: "job", name: _occupation.vertex.name, ...properties } })
+                $push({ vertex: <VertexType<typeof job>>{ id: _jobId, type: "job", name: _occupation.vertex.name, ...properties } })
                 // 1. connect the occupation to a job vert (occupation>>-includesJob->job->isWithinOccupation->>occupation)
                 $push({ edge: { source: _occupation.vertex.id, target: _jobId, type: "includesJob" } })
                 // 2. connect the person to the job vert (person>>-hasJob->job->workedBy->>person)
@@ -138,7 +138,7 @@ type createBuilder = {
     person: ReturnType<typeof person.create>,
     occupation: ReturnType<typeof occupation.create>,
     // TODO: could these be keyed?
-    dump: () => ({ node: NodeLike<string> } | { edge: EdgeLike<string> })[]
+    dump: () => ({ vertex: VertexLike<string> } | { edge: EdgeLike<string> })[]
 }
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
@@ -157,17 +157,17 @@ export const itPeopleDsl = (database: ReturnType<typeof createDb>) => {
 const createActivity = (database: ReturnType<typeof createDb>) => async <OptionalOutput>(query: ($: createBuilder) => OptionalOutput) => {
     // TODO: encapsulate as type, updatesString and updates are in sync
     const updatesStrings: string[] = []
-    const updates: ({ node: NodeLike<string> } | { edge: EdgeLike<string> })[] = []
+    const updates: ({ vertex: VertexLike<string> } | { edge: EdgeLike<string> })[] = []
     const $push: RawBuilder = (...items) => {
         // TODO: warn of duplicated pushes
         const itemsToPush = items.filter(item => !updatesStrings.includes(JSON.stringify(item)))
         updates.push(...itemsToPush)
         updatesStrings.push(...itemsToPush.map(item => JSON.stringify(item)))
     }
-    const $vertex = <VertexType extends string, Properties extends Record<string, unknown>>(node: NodeLike<VertexType> & Properties) => <Edges>(edges: Edges): VertexFindOrCreate<VertexType, Edges, Properties> => {
-        $push({ node })
+    const $vertex = <VertexType extends string, Properties extends Record<string, unknown>>(vertex: VertexLike<VertexType> & Properties) => <Edges>(edges: Edges): VertexFindOrCreate<VertexType, Edges, Properties> => {
+        $push({ vertex })
         return {
-            vertex: node,
+            vertex: vertex,
             ...edges
         }
     }
@@ -185,13 +185,13 @@ const createActivity = (database: ReturnType<typeof createDb>) => async <Optiona
         dump: () => [...updates]
     })
     // TODO: convert updates to query and execute (behind an await)
-    const nodes = (<never[]>updates).map(({ node }) => node as NodeLike<string>).filter(x => x)
+    const vertices = (<never[]>updates).map(({ vertex }) => vertex as VertexLike<string>).filter(x => x)
     const edges = (<never[]>updates).map(({ edge }) => edge as EdgeLike<string>).filter(x => x)
     const sql = linetrim`
         BEGIN TRANSACTION;
         
-        INSERT INTO nodes VALUES ${nodes.map((_, i) => `(:${i})`).join(", ")};
-        INSERT INTO edges VALUES ${edges.map((_, i) => `(:${nodes.length + i})`).join(", ")};
+        INSERT INTO vertices VALUES ${vertices.map((_, i) => `(:${i})`).join(", ")};
+        INSERT INTO edges VALUES ${edges.map((_, i) => `(:${vertices.length + i})`).join(", ")};
 
         COMMIT TRANSACTION;
         SELECT 1 as ok;
@@ -200,25 +200,25 @@ const createActivity = (database: ReturnType<typeof createDb>) => async <Optiona
         preview: () => sql,
         execute: async () => {
             const db = await database
-            const result = db.raw(sql, ...[...nodes, ...edges].map(node => JSON.stringify(node)))
+            const result = db.raw(sql, ...[...vertices, ...edges].map(vertex => JSON.stringify(vertex)))
             return result[0][0].ok === 1
         },
         createOutput
     };
 }
 
-const findActivity = <Domain>(database: ReturnType<typeof createDb>, queryBuilder: (one: <NodeType>(query: WhereClause<NodeType>) => any, many: <NodeType>(query: WhereClause<NodeType>) => any) => Domain): Domain => {
+const findActivity = <Domain>(database: ReturnType<typeof createDb>, queryBuilder: (one: <VertexType>(query: WhereClause<VertexType>) => any, many: <VertexType>(query: WhereClause<VertexType>) => any) => Domain): Domain => {
     return queryBuilder(
         oneQuery => {
-            return database.then(db => [...db.searchNodes(oneQuery, { OFFSET: 0, LIMIT: 1 })][0])
+            return database.then(db => [...db.searchVertices(oneQuery, { OFFSET: 0, LIMIT: 1 })][0])
         },
         manyQuery => {
-            return database.then(db => [...db.searchNodes(manyQuery)])
+            return database.then(db => [...db.searchVertices(manyQuery)])
         }
     )
 }
 
-const findActivityNodeOneOrMany = <VertexType extends NodeLike<string>>(databaseNodeTypeName: string, _one: <NodeType>(query: WhereClause<NodeType>) => any, _many: <NodeType>(query: WhereClause<NodeType>) => any) => ({
+const findActivityNodeOneOrMany = <VertexType extends VertexLike<string>>(databaseNodeTypeName: string, _one: <VertexType>(query: WhereClause<VertexType>) => any, _many: <VertexType>(query: WhereClause<VertexType>) => any) => ({
     one: async (idOrQuery?: string | WhereClause<VertexType>) => {
         if (idOrQuery) {
             return _one(typeof idOrQuery === "string" ? <WhereClause<VertexType>>{ id: { eq: `${databaseNodeTypeName}/${idOrQuery}` } } : idOrQuery) as VertexType

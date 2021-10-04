@@ -74,7 +74,7 @@ describe("sql", () => {
             field: string
         }
         db.insertNode<nodeType>({ id: "a", field: "value" })
-        const nodes = [...db.searchNodes<nodeType>({ field: { eq: "value" } })]
+        const nodes = [...db.searchVertices<nodeType>({ field: { eq: "value" } })]
         expect(nodes).toStrictEqual([{ id: "a", field: "value" }])
     })
 

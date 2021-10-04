@@ -1,26 +1,47 @@
-import { readFileSync } from "fs";
 import init, { BindParams, Database, ParamsObject, SqlValue } from "sql.js";
 const sqlite = init();
 
-const loadSql = (filename: string) => {
-    return readFileSync(`../sql/${filename}`).toString();
+export const linetrim = (strings: TemplateStringsArray, ...expr: string[]): string => {
+    return strings.slice(1).reduce((str, fragment, i) => str + expr[i] + fragment, strings[0]).replace(/^.*$/gm, line => line.trim() + `\n`)
 }
 
-export const createDb = async (schemaFile = "schema-new.sql") => {
+const DefaultSchema = linetrim`
+    CREATE TABLE IF NOT EXISTS vertices (
+        body TEXT,
+        id   TEXT GENERATED ALWAYS AS (json_extract(body, '$.id')) VIRTUAL NOT NULL UNIQUE
+    );
+
+    CREATE INDEX IF NOT EXISTS id_idx ON vertices(id);
+
+    CREATE TABLE IF NOT EXISTS edges (
+        properties TEXT,
+        source     TEXT GENERATED ALWAYS AS (json_extract(properties, '$.source')) VIRTUAL NOT NULL,
+        target     TEXT GENERATED ALWAYS AS (json_extract(properties, '$.target')) VIRTUAL NOT NULL,
+        id         TEXT GENERATED ALWAYS AS (coalesce(json_extract(properties, '$.id'), source || ':' || target)) VIRTUAL NOT NULL UNIQUE,
+        FOREIGN KEY(source) REFERENCES vertices(id),
+        FOREIGN KEY(target) REFERENCES vertices(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS id_idx ON edges(id);
+    CREATE INDEX IF NOT EXISTS source_idx ON edges(source);
+    CREATE INDEX IF NOT EXISTS target_idx ON edges(target);
+`
+
+export const createDb = async (schema = DefaultSchema) => {
     const database = new (await sqlite).Database();
-    database.exec(loadSql(schemaFile));
+    database.exec(schema);
     return {
         insertNode: <T extends { id: string }>(node: T) => {
-            database.run(loadSql("insert-node.sql"), [JSON.stringify(node)]);
+            database.run(`INSERT INTO vertices VALUES(json(?))`, [JSON.stringify(node)]);
         },
         updateNode: <T extends { id: string }>(node: T) => {
-            database.run(loadSql("update-node.sql"), [JSON.stringify(node), node.id])
+            database.run(`UPDATE vertices SET body = json(?) WHERE id = ?`, [JSON.stringify(node), node.id])
         },
         deleteNode: (id: string) => {
-            database.run(loadSql("delete-node.sql"), [id]);
+            database.run(`DELETE FROM vertices WHERE id = ?`, [id]);
         },
         getNodeById: <T extends { id: string }>(id: string) => {
-            const stmt = database.prepare(loadSql("search-node-by-id.sql"), [id]);
+            const stmt = database.prepare(`SELECT body FROM vertices WHERE id = ?`, [id]);
             if (stmt.step()) {
                 return JSON.parse(stmt.getAsObject().body!.toString()) as T;
             } else {
@@ -28,13 +49,13 @@ export const createDb = async (schemaFile = "schema-new.sql") => {
             }
         },
         insertEdge: <T extends { source: string, target: string, id?: string }>(edge: T) => {
-            database.run("INSERT INTO edges VALUES(json(?))", [JSON.stringify({ id: `${edge.source}:${edge.target}`, ...edge })]);
+            database.run(`INSERT INTO edges VALUES(json(?))`, [JSON.stringify({ id: `${edge.source}:${edge.target}`, ...edge })]);
         },
         deleteEdge: (id: string) => {
-            database.run("DELETE FROM edges WHERE id = ?", [id])
+            database.run(`DELETE FROM edges WHERE id = ?`, [id])
         },
         getEdgeById: <T extends { id: string, source: string, target: string }>(id: string): T | undefined => {
-            const stmt = database.prepare("SELECT * FROM edges wHERE id = ?", [id]);
+            const stmt = database.prepare(`SELECT * FROM edges wHERE id = ?`, [id]);
             if (stmt.step()) {
                 return JSON.parse(stmt.getAsObject().properties!.toString()) as T;
             } else {
@@ -46,17 +67,21 @@ export const createDb = async (schemaFile = "schema-new.sql") => {
                 yield* this.getEdges(toId, fromId);
                 direction = "fromTo";
             }
-            const stmt = database.prepare(loadSql("search-edges.sql"), direction === "fromTo" ? [fromId, toId] : [toId, fromId]);
+            const stmt = database.prepare(linetrim`
+                SELECT * FROM edges WHERE source = ? 
+                UNION
+                SELECT * FROM edges WHERE target = ?
+            `, direction === "fromTo" ? [fromId, toId] : [toId, fromId]);
             while (stmt.step()) {
                 const edge = stmt.getAsObject() as any as { id: string, source: string, target: string, properties: string };
                 yield JSON.parse(edge.properties) as T;
             }
         },
-        searchNodes: function* <T>(query: WhereClause<Partial<T>>, finalClause?: { OFFSET: number, LIMIT: number }) {
+        searchVertices: function* <T>(query: WhereClause<Partial<T>>, finalClause?: { OFFSET: number, LIMIT: number }) {
             const where = whereClauseToSql(query, "body");
             // TODO: this would be better as object params as opposed to array
             const finalClauseSql = finalClause ? `LIMIT ${finalClause.LIMIT + 0} OFFSET ${finalClause.OFFSET + 0}` : ``;
-            const stmt = database.prepare(`SELECT * FROM nodes WHERE ${where.sql} ${finalClauseSql}`, where.params)
+            const stmt = database.prepare(`SELECT * FROM vertices WHERE ${where.sql} ${finalClauseSql}`, where.params)
             while (stmt.step()) {
                 yield JSON.parse(stmt.getAsObject().body!.toString()) as T;
             }
@@ -76,7 +101,7 @@ export const createDb = async (schemaFile = "schema-new.sql") => {
                 WITH RECURSIVE traverse(x, z, y) AS (
                 SELECT :0, '', '()'
                 UNION
-                SELECT id, null, 'node' FROM nodes JOIN traverse ON id = x
+                SELECT id, null, 'node' FROM vertices JOIN traverse ON id = x
                 ${direction !== "targets" ? `
                     UNION
                     SELECT source, id as eid, 'sources' FROM edges JOIN traverse ON target = x
@@ -101,7 +126,7 @@ export const createDb = async (schemaFile = "schema-new.sql") => {
                 WITH RECURSIVE traverse(x, z, y, obj) AS (
                 SELECT :0, '', '()', '{}'
                 UNION
-                SELECT id, null, 'node', body FROM nodes JOIN traverse ON id = x
+                SELECT id, null, 'node', body FROM vertices JOIN traverse ON id = x
                 ${direction !== "targets" ? `
                     UNION
                     SELECT source, id as eid, 'sources', properties FROM edges JOIN traverse ON target = x
@@ -191,8 +216,4 @@ export const whereClauseToSql = <T>(query: WhereClause<Partial<T>>, jsonField?: 
         sql: result.sql.trim(),
         params: result.params
     };
-}
-
-export const linetrim = (strings: TemplateStringsArray, ...expr: string[]): string => {
-    return strings.slice(1).reduce((str, fragment, i) => str + expr[i] + fragment, strings[0]).replace(/^.*$/gm, line => line.trim() + `\n`)
 }

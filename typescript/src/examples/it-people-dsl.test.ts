@@ -49,17 +49,17 @@ describe("it-people-dsl", () => {
         // run the graph
         const joeBloggsGraph = await joeBloggsQuery;
         expect(joeBloggsGraph.createOutput).toEqual([
-            // nodes
-            { node: { id: "company/Acme Inc.", name: "Acme Inc.", type: "company" } },
-            { node: { id: "skill/TypeScript", name: "TypeScript", type: "skill" } },
-            { node: { id: "skill/Python", name: "Python", type: "skill" } },
-            { node: { id: "skill/Agile", name: "Agile", type: "skill" } },
-            { node: { id: "occupation/Software Developer", name: "Software Developer", type: "occupation" } },
-            { node: { id: "person/Joe Bloggs", name: "Joe Bloggs", type: "person" } },
+            // vertices
+            { vertex: { id: "company/Acme Inc.", name: "Acme Inc.", type: "company" } },
+            { vertex: { id: "skill/TypeScript", name: "TypeScript", type: "skill" } },
+            { vertex: { id: "skill/Python", name: "Python", type: "skill" } },
+            { vertex: { id: "skill/Agile", name: "Agile", type: "skill" } },
+            { vertex: { id: "occupation/Software Developer", name: "Software Developer", type: "occupation" } },
+            { vertex: { id: "person/Joe Bloggs", name: "Joe Bloggs", type: "person" } },
             // edges
             { edge: { source: "person/Joe Bloggs", target: "company/Acme Inc.", type: "worksAt", beginning: worksAtAcmeBeginning } },
             // these records are created by 'as' on the 'worksAt' API
-            { node: { id: "job/#-368659788", name: "Software Developer", type: "job", level: "senior" } },
+            { vertex: { id: "job/#-368659788", name: "Software Developer", type: "job", level: "senior" } },
             { edge: { source: "occupation/Software Developer", target: "job/#-368659788", type: "includesJob" } },
             { edge: { source: "person/Joe Bloggs", target: "job/#-368659788", type: "hasJob" } },
             { edge: { source: "person/Joe Bloggs", target: "occupation/Software Developer", type: "worksAs" } },
@@ -69,9 +69,9 @@ describe("it-people-dsl", () => {
             { edge: { source: "person/Joe Bloggs", target: "skill/Python", type: "usesTheSkill" } },
             { edge: { source: "person/Joe Bloggs", target: "skill/Agile", type: "usesTheSkill" } },
             // extra
-            { node: { id: "company/Widget Factory", name: "Widget Factory", type: "company" } },
+            { vertex: { id: "company/Widget Factory", name: "Widget Factory", type: "company" } },
             { edge: { source: "person/Joe Bloggs", target: "company/Widget Factory", type: "worksAt", beginning: worksAtWidgetFactoryBeginning, ending: worksAtWidgetFactoryEnding } },
-            { node: { id: "job/#1339652452", name: "Software Developer", type: "job", level: "mid" } },
+            { vertex: { id: "job/#1339652452", name: "Software Developer", type: "job", level: "mid" } },
             { edge: { source: "occupation/Software Developer", target: "job/#1339652452", type: "includesJob" } },
             { edge: { source: "person/Joe Bloggs", target: "job/#1339652452", type: "hasJob" } },
             { edge: { source: "job/#1339652452", target: "company/Widget Factory", type: "isPerformedFor" } },
@@ -82,7 +82,7 @@ describe("it-people-dsl", () => {
         expect(joeBloggsGraph.preview()).toBe(linetrim`
             BEGIN TRANSACTION;
 
-            INSERT INTO nodes VALUES (:0), (:1), (:2), (:3), (:4), (:5), (:6), (:7), (:8);
+            INSERT INTO vertices VALUES (:0), (:1), (:2), (:3), (:4), (:5), (:6), (:7), (:8);
             INSERT INTO edges VALUES (:9), (:10), (:11), (:12), (:13), (:14), (:15), (:16), (:17), (:18), (:19), (:20), (:21);
 
             COMMIT TRANSACTION;
@@ -90,7 +90,7 @@ describe("it-people-dsl", () => {
         `)
 
         // assert the database is empty
-        const count = (await database).raw("SELECT (SELECT count(*) FROM nodes) + (SELECT count(*) FROM edges) as total")[0][0].total
+        const count = (await database).raw("SELECT (SELECT count(*) FROM vertices) + (SELECT count(*) FROM edges) as total")[0][0].total
         expect(count).toBe(0)
 
         // execute the graph (apply it to the database)
