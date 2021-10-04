@@ -42,6 +42,13 @@ const nodeType = <NodeType extends string, Properties extends Record<string, unk
 type EdgeType<T extends { create: (...args: never[]) => (...args: never[]) => unknown }> = ReturnType<ReturnType<T["create"]>>
 type VertexType<T extends { create: (...args: never[]) => (...args: never[]) => { vertex: NodeLike<string> } }> = ReturnType<ReturnType<T["create"]>>["vertex"]
 
+
+
+
+
+
+
+
 // IT People DSL
 const job = nodeType<"job", { level: "junior" | "mid" | "senior" | "principal" }>("job")
 const company = nodeType("company")

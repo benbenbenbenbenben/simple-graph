@@ -50,16 +50,16 @@ describe("it-people-dsl", () => {
         const joeBloggsGraph = await joeBloggsQuery;
         expect(joeBloggsGraph.createOutput).toEqual([
             // nodes
-            { node: { id: "company/Acme Inc.", type: "company" } },
-            { node: { id: "skill/TypeScript", type: "skill" } },
-            { node: { id: "skill/Python", type: "skill" } },
-            { node: { id: "skill/Agile", type: "skill" } },
-            { node: { id: "occupation/Software Developer", type: "occupation" } },
-            { node: { id: "person/Joe Bloggs", type: "person" } },
+            { node: { id: "company/Acme Inc.", name: "Acme Inc.", type: "company" } },
+            { node: { id: "skill/TypeScript", name: "TypeScript", type: "skill" } },
+            { node: { id: "skill/Python", name: "Python", type: "skill" } },
+            { node: { id: "skill/Agile", name: "Agile", type: "skill" } },
+            { node: { id: "occupation/Software Developer", name: "Software Developer", type: "occupation" } },
+            { node: { id: "person/Joe Bloggs", name: "Joe Bloggs", type: "person" } },
             // edges
             { edge: { source: "person/Joe Bloggs", target: "company/Acme Inc.", type: "worksAt", beginning: worksAtAcmeBeginning } },
             // these records are created by 'as' on the 'worksAt' API
-            { node: { id: "job/#-368659788", type: "job", level: "senior" } },
+            { node: { id: "job/#-368659788", name: "Software Developer", type: "job", level: "senior" } },
             { edge: { source: "occupation/Software Developer", target: "job/#-368659788", type: "includesJob" } },
             { edge: { source: "person/Joe Bloggs", target: "job/#-368659788", type: "hasJob" } },
             { edge: { source: "person/Joe Bloggs", target: "occupation/Software Developer", type: "worksAs" } },
@@ -69,9 +69,9 @@ describe("it-people-dsl", () => {
             { edge: { source: "person/Joe Bloggs", target: "skill/Python", type: "usesTheSkill" } },
             { edge: { source: "person/Joe Bloggs", target: "skill/Agile", type: "usesTheSkill" } },
             // extra
-            { node: { id: "company/Widget Factory", type: "company" } },
+            { node: { id: "company/Widget Factory", name: "Widget Factory", type: "company" } },
             { edge: { source: "person/Joe Bloggs", target: "company/Widget Factory", type: "worksAt", beginning: worksAtWidgetFactoryBeginning, ending: worksAtWidgetFactoryEnding } },
-            { node: { id: "job/#1339652452", type: "job", level: "mid" } },
+            { node: { id: "job/#1339652452", name: "Software Developer", type: "job", level: "mid" } },
             { edge: { source: "occupation/Software Developer", target: "job/#1339652452", type: "includesJob" } },
             { edge: { source: "person/Joe Bloggs", target: "job/#1339652452", type: "hasJob" } },
             { edge: { source: "job/#1339652452", target: "company/Widget Factory", type: "isPerformedFor" } },
@@ -101,6 +101,7 @@ describe("it-people-dsl", () => {
         const joeBloggsFound = await find.person().one("Joe Bloggs")
         expect(joeBloggsFound).toEqual({
             id: "person/Joe Bloggs",
+            name: "Joe Bloggs",
             type: "person"
         })
         // ...and check it's Joe Bloggs when we take the "first" person
