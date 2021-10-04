@@ -11,7 +11,7 @@ type VertexFindOrCreate<VertexType extends string, Edges, VertexProperties exten
 
 type RawBuilder = <T extends ({ node: NodeLike<string> } | { edge: EdgeLike<string> }) >(...items: T[]) => void
 
-type NodeLike<Type extends string, P extends Record<string, unknown> = Record<string, unknown>> = P & { id: string, type: Type }
+type NodeLike<Type extends string, P extends Record<string, unknown> = Record<string, unknown>> = P & { id: string, type: Type, name: string }
 type VertexBuilder = <VertexType extends string, Properties extends Record<string, unknown> = Record<string, unknown>>(node: NodeLike<VertexType, Properties>) => <Edges>(edges: Edges) => VertexFindOrCreate<VertexType, Edges, Properties>
 
 type EdgeLike<T extends string> = { source: string, target: string, type: T }
@@ -34,7 +34,7 @@ const nodeType = <NodeType extends string, Properties extends Record<string, unk
         ) => (
             name: string
         ) => $vertex<NodeType, Properties>(/* TODO: this cast is needed, but why is it? */<NodeLike<NodeType, Properties>>{
-            id: `${type}/${name}`, type
+            id: `${type}/${name}`, name, type
         })(build ? build({ $vertex, $edge, $push }, name) : <CreateEdges>{})
     })
 
@@ -74,7 +74,7 @@ const person = nodeType("person", ({ $edge, $push }, personName) => ({
         })({
             as: (
                 _occupation: EdgeType<typeof occupation>,
-                properties: Omit<VertexType<typeof job>, "id" | "type">) => {
+                properties: Omit<VertexType<typeof job>, "id" | "type" | "name">) => {
                 /**
                  * Enhanced Behaviour:
                  * In this special scenario, 'as' behaves as: 
@@ -96,7 +96,7 @@ const person = nodeType("person", ({ $edge, $push }, personName) => ({
                     properties
                 })
                 const _jobId = `job/#${hash}`
-                $push({ node: <VertexType<typeof job>>{ id: _jobId, type: "job", ...properties } })
+                $push({ node: <VertexType<typeof job>>{ id: _jobId, type: "job", name: _occupation.vertex.name, ...properties } })
                 // 1. connect the occupation to a job vert (occupation>>-includesJob->job->isWithinOccupation->>occupation)
                 $push({ edge: { source: _occupation.vertex.id, target: _jobId, type: "includesJob" } })
                 // 2. connect the person to the job vert (person>>-hasJob->job->workedBy->>person)
@@ -157,7 +157,7 @@ const createActivity = (database: ReturnType<typeof createDb>) => async <Optiona
         updates.push(...itemsToPush)
         updatesStrings.push(...itemsToPush.map(item => JSON.stringify(item)))
     }
-    const $vertex = <VertexType extends string, Properties extends {}>(node: NodeLike<VertexType> & Properties) => <Edges>(edges: Edges): VertexFindOrCreate<VertexType, Edges, Properties> => {
+    const $vertex = <VertexType extends string, Properties extends Record<string, unknown>>(node: NodeLike<VertexType> & Properties) => <Edges>(edges: Edges): VertexFindOrCreate<VertexType, Edges, Properties> => {
         $push({ node })
         return {
             vertex: node,
@@ -227,9 +227,9 @@ const findActivityNodeOneOrMany = <VertexType extends NodeLike<string>>(database
 export const objectHash = (obj: unknown): number => {
     const str = JSON.stringify(obj)
     let hash = 0
-	for (let i = 0; i < str.length; i++) {
-		hash += Math.pow(str.charCodeAt(i) * 31, str.length - i)
-		hash = hash & hash
-	}
-	return hash
+    for (let i = 0; i < str.length; i++) {
+        hash += Math.pow(str.charCodeAt(i) * 31, str.length - i)
+        hash = hash & hash
+    }
+    return hash
 }
