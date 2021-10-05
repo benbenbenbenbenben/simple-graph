@@ -15,7 +15,7 @@ describe("it-people-dsl", () => {
         const worksAtWidgetFactoryEnding = DateTime.fromISO("2019-12-01")
 
         // run a graph create
-        const joeBloggsQuery = create($ => {
+        const joeBloggsGraph = create($ => {
             // company
             const AcmeInc = $.company("Acme Inc.")
             // skills
@@ -41,13 +41,12 @@ describe("it-people-dsl", () => {
             // connect Software Developer to Agile skill
             const { that: SoftwareDeveloperIsARoleThat } = SoftwareDeveloper
             SoftwareDeveloperIsARoleThat.mayRequire(AgileMethodologies)
-
+            
             // return all the updates so we can examine them (as .createOutput: any | void)
             return $.dump()
         })
 
         // run the graph
-        const joeBloggsGraph = await joeBloggsQuery;
         expect(joeBloggsGraph.createOutput).toEqual([
             // vertices
             { vertex: { id: "company/Acme Inc.", name: "Acme Inc.", type: "company" } },
@@ -93,8 +92,8 @@ describe("it-people-dsl", () => {
         const count = (await database).raw("SELECT (SELECT count(*) FROM vertices) + (SELECT count(*) FROM edges) as total")[0][0].total
         expect(count).toBe(0)
 
-        // execute the graph (apply it to the database)
-        const execution = await joeBloggsGraph.execute()
+        // commit the graph (apply it to the database)
+        const execution = await joeBloggsGraph.commit()
         expect(execution).toBe(true)
 
         // find vertex (simple, none traversal)
