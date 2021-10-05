@@ -39,11 +39,11 @@ type VertexLike<Type extends string, P extends Record<string, unknown> = Record<
 
 type EdgeLike<T extends string> = { source: string; target: string; type: T }
 
-export type EdgeType<T extends { create: (...args: never[]) => (...args: never[]) => unknown }> = ReturnType<
+export type VertexRef<T extends { create: (...args: never[]) => (...args: never[]) => unknown }> = ReturnType<
     ReturnType<T['create']>
 >
 
-export type VertexCreateType<
+export type VertexModelRef<
     T extends { create: (...args: never[]) => (...args: never[]) => { vertex: VertexLike<string> } },
     > = ReturnType<ReturnType<T['create']>>['vertex']
 

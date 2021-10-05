@@ -1,6 +1,5 @@
 import { DateTime } from "luxon"
-import { createDb } from "@src/index"
-import { EdgeType, objectHash, addVertex, VertexCreateType, dsl } from "@src/design/index"
+import { VertexRef, objectHash, addVertex, VertexModelRef, dsl } from "@src/design/index"
 
 // IT People DSL
 const job = addVertex<"job", { level: "junior" | "mid" | "senior" | "principal" }>("job")
@@ -9,7 +8,7 @@ const skill = addVertex("skill")
 const occupation = addVertex("occupation", ({ $edge }, occupationName) => ({
     that: {
         mayRequire: (
-            _skill: EdgeType<typeof skill>
+            _skill: VertexRef<typeof skill>
         ) => $edge({
             type: "mayRequire",
             source: `occupation/${occupationName}`,
@@ -21,7 +20,7 @@ const person = addVertex("person", ({ $edge, $push }, personName) => ({
     /* contextual edges */
     that: {
         worksAt: (
-            _company: EdgeType<typeof company>,
+            _company: VertexRef<typeof company>,
             properties: {
                 beginning: DateTime,
                 ending?: DateTime,
@@ -33,8 +32,8 @@ const person = addVertex("person", ({ $edge, $push }, personName) => ({
             target: _company.vertex.id
         }, {
             as: (
-                _occupation: EdgeType<typeof occupation>,
-                properties: Omit<VertexCreateType<typeof job>, "id" | "type" | "name">) => {
+                _occupation: VertexRef<typeof occupation>,
+                properties: Omit<VertexModelRef<typeof job>, "id" | "type" | "name">) => {
                 /**
                  * Enhanced Behaviour:
                  * In this special scenario, 'as' behaves as: 
@@ -56,7 +55,7 @@ const person = addVertex("person", ({ $edge, $push }, personName) => ({
                     properties
                 })
                 const _jobId = `job/#${hash}`
-                $push({ vertex: <VertexCreateType<typeof job>>{ id: _jobId, type: "job", name: _occupation.vertex.name, ...properties } })
+                $push({ vertex: { id: _jobId, type: "job", name: _occupation.vertex.name, ...properties } })
                 // 1. connect the occupation to a job vert (occupation>>-includesJob->job->isWithinOccupation->>occupation)
                 $push({ edge: { source: _occupation.vertex.id, target: _jobId, type: "includesJob" } })
                 // 2. connect the person to the job vert (person>>-hasJob->job->workedBy->>person)
@@ -69,14 +68,14 @@ const person = addVertex("person", ({ $edge, $push }, personName) => ({
             }
         }),
         usesTheSkill: (
-            _skill: EdgeType<typeof skill>
+            _skill: VertexRef<typeof skill>
         ) => $edge({
             type: "usesTheSkill",
             source: `person/${personName}`,
             target: _skill.vertex.id
         }, {
             at: (
-                _company: ReturnType<ReturnType<typeof company.create>>
+                _company: VertexRef<typeof company>
             ) => {
                 // TODO: what do we do here?
                 return _company
