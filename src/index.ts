@@ -1,4 +1,4 @@
-import init, { BindParams, Database, ParamsObject, SqlValue } from "sql.js";
+import init, { ParamsObject, SqlValue } from "sql.js";
 const sqlite = init();
 
 export const linetrim = (strings: TemplateStringsArray, ...expr: string[]): string => {
@@ -114,10 +114,13 @@ export const createDb = async (schema = DefaultSchema) => {
             `
             const stmt = database.prepare(sql, [nodeId]);
             while (stmt.step()) {
-                yield stmt.getAsObject() as any
+                yield stmt.getAsObject() as {
+                    id: string,
+                    kind: "node" | "sources" | "targets"
+                }
             }
         },
-        traverseWithBody: function* <NodeTypes = {}, SourceTypes = {}, TargetTypes = {}>(nodeId: string, direction: "both" | "sources" | "targets" = "both"): IterableIterator<
+        traverseWithBody: function* <NodeTypes = unknown, SourceTypes = unknown, TargetTypes = unknown>(nodeId: string, direction: "both" | "sources" | "targets" = "both"): IterableIterator<
             { id: string } & (
                 { kind: "node", node: NodeTypes } | { kind: "sources", sources: SourceTypes } | { kind: "targets", targets: TargetTypes }
             )

@@ -1,6 +1,14 @@
-# About
+# Novel Graphic
 
 ```TypeScript
+/*
+  _   _                _    ____                 _     _      
+ | \ | | _____   _____| |  / ___|_ __ __ _ _ __ | |__ (_) ___ 
+ |  \| |/ _ \ \ / / _ \ | | |  _| '__/ _` | '_ \| '_ \| |/ __|
+ | |\  | (_) \ V /  __/ | | |_| | | | (_| | |_) | | | | | (__ 
+ |_| \_|\___/ \_/ \___|_|  \____|_|  \__,_| .__/|_| |_|_|\___|
+                                          |_|                 
+*/
 create($ => 
   $.openSourceProject(
       "Novel Graphic" {
@@ -20,7 +28,6 @@ create($ =>
 ).commit()
 ```
 
-# Novel Graphic is Graph Database
 
 Novel Graphic is a serverless graph database with a DSL for building typed graphs.
 
