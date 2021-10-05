@@ -1,59 +1,58 @@
 # About
 
 ```TypeScript
-const grafluent = $.openSourceProject(
-  "Grafluent" {
-    by: "Benjamin Babik" }
-).isForkedFrom(
-  "simple-graph", { 
-    by: "Denis Papathanasiou" }
-).and.isInspiredBy(
-  { "SQLite as a document database": { 
-    blog: "https://dgl.cx/2020/06/sqlite-json-support" } },
-  { "JanusGraph": {
-    }}
-)
+create($ => 
+  $.openSourceProject(
+      "Novel Graphic" {
+        by: "Benjamin Babik" }
+    ).isA(
+      "Graph Database"
+    ).that.isForkedFrom(
+      "simple-graph", { 
+        by: "Denis Papathanasiou",
+        www: "https://github.com/dpapathanasiou/simple-graph" }
+    ).and.isInspiredBy(
+      { "SQLite as a document database": { 
+        www: "https://dgl.cx/2020/06/sqlite-json-support" } },
+      { "JanusGraph": {
+        www: "https://janusgraph.org/" } }
+    )
+).commit()
 ```
 
-This is a simple [graph database](https://en.wikipedia.org/wiki/Graph_database) in [SQLite](https://www.sqlite.org/), inspired by "[SQLite as a document database](https://dgl.cx/2020/06/sqlite-json-support)".
+# Novel Graphic is Graph Database
 
-# Structure
+Novel Graphic is a serverless graph database with a DSL for building typed graphs.
 
-The [schema](sql/schema.sql) consists of just two structures:
+It ships with a SQLite driver and uses [sql.js](https://github.com/sql-js/sql.js/). It can be made to target other SQL databases by writing a driver as well as probably any other kind of storage, locally or remotely.
 
-* Nodes - these are any [json](https://www.json.org/) objects, with the only constraint being that they each contain a unique `id` value 
-* Edges - these are pairs of node `id` values, specifying the direction, with an optional json object as connection properties
-
-There are also traversal functions as native SQLite [Common Table Expressions](https://www.sqlite.org/lang_with.html) which produce lists of identifiers or return all objects along the path:
-
-* Both directions
-  * [identifiers](sql/traverse.sql)
-  * [all objects](sql/traverse-with-bodies.sql)
-* Inbound
-  * [identifiers](sql/traverse-inbound.sql)
-  * [all objects](sql/traverse-with-bodies-inbound.sql)
-* Outbound
-  * [identifiers](sql/traverse-outbound.sql)
-  * [all objects](sql/traverse-with-bodies-outbound.sql)
-
-# Applications
-
-* [Social networks](https://en.wikipedia.org/wiki/Social_graph)
-* [Interest maps/recommendation finders](https://en.wikipedia.org/wiki/Interest_graph)
-* [To-do / task lists](https://en.wikipedia.org/wiki/Task_list)
-* [Bug trackers](https://en.wikipedia.org/wiki/Open-source_software_development#Bug_trackers_and_task_lists)
-* [Customer relationship management (CRM)](https://en.wikipedia.org/wiki/Customer_relationship_management)
-* [Gantt chart](https://en.wikipedia.org/wiki/Gantt_chart)
+Because it doesn't depend on database servers, it happily runs in the browser or node.js without any additional dependencies.
 
 # Usage
 
-Choose an implementation:
+## Node.js
 
-* [Python](python) (now [available in PyPI](https://pypi.org/project/simple-graph-sqlite/))
-* [Go](go)
+Install it.
 
-Want to contribute a version in your preferred language?
+`yarn add novelgraphic`
 
-The [schema and prepared sql statements](sql) can be used by programs in *any* programming language with [SQLite bindings](https://en.wikipedia.org/wiki/SQLite#Programming_language_support). 
+Design your graph.
 
-[Pull requests](https://help.github.com/articles/about-pull-requests/) are welcome!
+```TypeScript
+import { vertex } from "novelgraphic/design"
+
+const person = vertex("person")
+const company = vertex("company")
+const skill = vertex("skill")
+const occupation = addVertex("occupation", ({ $edge }, occupationName) => ({
+    that: {
+        mayRequire: (_skill: EdgeType<typeof skill>) => $edge({
+            type: "mayRequire",
+            source: `occupation/${occupationName}`,
+            target: _skill.vertex.id
+        })
+    }
+}))
+```
+
+Use a graph

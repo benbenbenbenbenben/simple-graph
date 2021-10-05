@@ -1,6 +1,6 @@
 import { DateTime } from "luxon"
 import { createDb } from "@src/index"
-import { EdgeType, objectHash, addVertex, VertexCreateType, createActivity, findActivity, findActivityNodeOneOrMany } from "@src/design/index"
+import { EdgeType, objectHash, addVertex, VertexCreateType, dsl } from "@src/design/index"
 
 // IT People DSL
 const job = addVertex<"job", { level: "junior" | "mid" | "senior" | "principal" }>("job")
@@ -85,22 +85,10 @@ const person = addVertex("person", ({ $edge, $push }, personName) => ({
     }
 }))
 
-
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-export const itPeopleDsl = (database: ReturnType<typeof createDb>) => {
-
-    return {
-        create: createActivity(database, {
-            job,
-            company,
-            skill,
-            person,
-            occupation
-        }),
-
-        find: findActivity(database, (_one, _many) => ({
-            person: () => findActivityNodeOneOrMany<ReturnType<ReturnType<typeof person.create>>["vertex"]>("person", _one, _many),
-            company: () => findActivityNodeOneOrMany<ReturnType<ReturnType<typeof company.create>>["vertex"]>("company", _one, _many),
-        }))
-    }
-}
+export const itPeopleDsl = dsl({
+    job,
+    company,
+    skill,
+    person,
+    occupation,
+})

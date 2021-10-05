@@ -97,18 +97,18 @@ describe("it-people-dsl", () => {
         expect(execution).toBe(true)
 
         // find vertex (simple, none traversal)
-        const joeBloggsFound = await find.person().one("Joe Bloggs")
+        const joeBloggsFound = await find.person.one("Joe Bloggs")
         expect(joeBloggsFound).toEqual({
             id: "person/Joe Bloggs",
             name: "Joe Bloggs",
             type: "person"
         })
         // ...and check it's Joe Bloggs when we take the "first" person
-        expect(await find.person().one()).toEqual(joeBloggsFound)
+        expect(await find.person.one()).toEqual(joeBloggsFound)
         // ...and check it's [Joe Bloggs] when we take all persons
-        expect(await find.person().many()).toEqual([joeBloggsFound])
+        expect(await find.person.many()).toEqual([joeBloggsFound])
 
         // there are 2 companies
-        expect((await find.company().many()).length).toBe(2)
+        expect((await find.company.many()).length).toBe(2)
     })
 })

@@ -80,6 +80,7 @@ export const addVertex = <
         build?: (
             build: { $vertex: VertexBuilder; $edge: EdgeBuilder; $push: RawBuilder },
             sourceName: string,
+            properties?: VProps,
         ) => CreateEdges,
 ): {
     create: VertexCreate<VType, VProps, CreateEdges>
@@ -99,7 +100,7 @@ export const addVertex = <
                 name,
                 type,
                 ...properties
-            })(build ? build({ $vertex, $edge, $push }, name) : <CreateEdges>{}),
+            })(build ? build({ $vertex, $edge, $push }, name, properties) : <CreateEdges>{}),
 })
 
 
@@ -177,13 +178,13 @@ export const createActivity = <
         }
     }
 
-export const findActivity = <Domain>(
+export const findActivity = <Map extends DomainMap>(
     database: ReturnType<typeof createDb>,
     queryBuilder: (
         one: <VertexType>(query: WhereClause<VertexType>) => any,
         many: <VertexType>(query: WhereClause<VertexType>) => any,
-    ) => Domain,
-): Domain => {
+    ) => Map,
+): Map => {
     return queryBuilder(
         (oneQuery) => {
             return database.then((db) => [...db.searchVertices(oneQuery, { OFFSET: 0, LIMIT: 1 })][0])
@@ -194,24 +195,53 @@ export const findActivity = <Domain>(
     )
 }
 
-export const findActivityNodeOneOrMany = <VertexType extends VertexLike<string>>(
+type FindOne<V> = (idOrQuery?: string | WhereClause<V>) => Promise<V>
+type FindMany<V> = (idOrQuery?: string | WhereClause<V>) => Promise<V[]>
+
+type FindOneOrManyAPI<V> = {
+    one: FindOne<V>
+    many: FindMany<V>
+}
+
+
+type FindOneOrManyMap<Map extends DomainMap> = {
+    [key in keyof Map]: FindOneOrManyAPI<ReturnType<ReturnType<Map[key]['create']>>['vertex']>
+}
+
+export const findActivityNodeOneOrMany = <VLike extends VertexLike<string>>(
     databaseNodeTypeName: string,
     _one: <VertexType>(query: WhereClause<VertexType>) => any,
     _many: <VertexType>(query: WhereClause<VertexType>) => any,
-) => ({
-    one: async (idOrQuery?: string | WhereClause<VertexType>) => {
+): FindOneOrManyAPI<VLike> => ({
+    one: async (idOrQuery?: string | WhereClause<VLike>) => {
         if (idOrQuery) {
             return _one(
                 typeof idOrQuery === 'string'
-                    ? <WhereClause<VertexType>>{ id: { eq: `${databaseNodeTypeName}/${idOrQuery}` } }
+                    ? <WhereClause<VLike>>{ id: { eq: `${databaseNodeTypeName}/${idOrQuery}` } }
                     : idOrQuery,
-            ) as VertexType
+            ) as VLike
         } else {
-            return _one({ type: { eq: databaseNodeTypeName } }) as VertexType
+            return _one({ type: { eq: databaseNodeTypeName } }) as VLike
         }
     },
-    many: async (query = <WhereClause<VertexType>>{ type: { eq: databaseNodeTypeName } }) => {
-        return _many(query) as VertexType[]
+    many: async (idOrQuery?: string | WhereClause<VLike>) => {
+        if (idOrQuery) {
+            return _many(
+                typeof idOrQuery === 'string'
+                    ? <WhereClause<VLike>>{
+                        id:
+                            { eq: `${databaseNodeTypeName}/${idOrQuery}` },
+                        type:
+                            { eq: databaseNodeTypeName }
+                    }
+                    : idOrQuery,
+            ) as VLike[]
+        } else {
+            return _many({
+                type:
+                    { eq: databaseNodeTypeName }
+            }) as VLike[]
+        }
     },
 })
 
@@ -224,4 +254,21 @@ export const objectHash = (obj: unknown): number => {
         hash = hash & hash
     }
     return hash
+}
+
+
+export const dsl = <Map extends DomainMap>(
+    domain: Map
+) => {
+    return (
+        database: ReturnType<typeof createDb>
+    ) => ({
+        create: createActivity(database, domain),
+        find: <FindOneOrManyMap<Map>>findActivity(database, (_one, _many) =>
+            Object.entries(domain).reduce((fa, [n, { create }]) => ({
+                ...fa,
+                [n]: findActivityNodeOneOrMany<ReturnType<ReturnType<typeof create>>["vertex"]>(n, _one, _many),
+            }), {})
+        )
+    })
 }
