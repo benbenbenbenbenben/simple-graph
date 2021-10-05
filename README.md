@@ -1,14 +1,26 @@
 # Novel Graphic
 
+Novel Graphic is a serverless graph database with a DSL for building typed graphs.
+
+It ships with a SQLite driver and uses [sql.js](https://github.com/sql-js/sql.js/). It can be made to target other SQL databases by writing a driver as well as probably any other kind of storage, locally or remotely.
+
+Because it doesn't depend on database servers, it happily runs in the browser or node.js without any additional dependencies.
+
+# Jump In
+
+## 1. Design a Domain
+
 ```TypeScript
-/*
-  _   _                _    ____                 _     _      
- | \ | | _____   _____| |  / ___|_ __ __ _ _ __ | |__ (_) ___ 
- |  \| |/ _ \ \ / / _ \ | | |  _| '__/ _` | '_ \| '_ \| |/ __|
- | |\  | (_) \ V /  __/ | | |_| | | | (_| | |_) | | | | | (__ 
- |_| \_|\___/ \_/ \___|_|  \____|_|  \__,_| .__/|_| |_|_|\___|
-                                          |_|                 
-*/
+const person = vertex<>
+
+const openSourceProject = vertex<{ by: string  }>("foss-project"),
+
+})
+```
+
+## 2. Use a Domain
+
+```TypeScript
 create($ => 
   $.openSourceProject(
       "Novel Graphic" {
@@ -27,13 +39,6 @@ create($ =>
     )
 ).commit()
 ```
-
-
-Novel Graphic is a serverless graph database with a DSL for building typed graphs.
-
-It ships with a SQLite driver and uses [sql.js](https://github.com/sql-js/sql.js/). It can be made to target other SQL databases by writing a driver as well as probably any other kind of storage, locally or remotely.
-
-Because it doesn't depend on database servers, it happily runs in the browser or node.js without any additional dependencies.
 
 # Usage
 

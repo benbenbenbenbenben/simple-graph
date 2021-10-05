@@ -55,6 +55,17 @@ type VertexCreate<
         vertex: VertexBuilder, edge: EdgeBuilder, raw: RawBuilder
     ) => (name: string, properties?: VProps) => VertexFindOrCreate<VertexLike<VType, VProps>, Edges>
 
+type VertexCreateWithFields<
+    VType extends string,
+    VProps extends Props = any,
+    Edges = Record<string, unknown>
+    > = (
+        vertex: VertexBuilder, edge: EdgeBuilder, raw: RawBuilder
+    ) => (
+            name: string, properties: VProps
+        ) => VertexFindOrCreate<VertexLike<VType, VProps>, Edges>
+
+
 type DomainMap = {
     [typeName: string]: {
         create: VertexCreate<typeof typeName>
@@ -71,28 +82,38 @@ type Props = {
     [x: string]: number | string | boolean | Props
 }
 
-export const addVertex = <
+export const vertex = <
     VType extends string,
-    VProps extends Props = Props,
-    CreateEdges = Record<string, unknown>,
     >(
-        type: VType,
-        build?: (
+        type: VType
+    ): {
+        withFields: <VProps extends Props>() => {
+            create: VertexCreateWithFields<VType, VProps>,
+            andCtor: <CreateEdges>(build: (
+                build: { $vertex: VertexBuilder; $edge: EdgeBuilder; $push: RawBuilder },
+                sourceName: string,
+                properties: VProps,
+            ) => CreateEdges,) => {
+                create: VertexCreateWithFields<VType, VProps, CreateEdges>,
+            },
+        },
+        create: VertexCreate<VType, Props>,
+        withCtor: <CreateEdges>(build: (
             build: { $vertex: VertexBuilder; $edge: EdgeBuilder; $push: RawBuilder },
             sourceName: string,
-            properties?: VProps,
-        ) => CreateEdges,
-): {
-    create: VertexCreate<VType, VProps, CreateEdges>
-} => ({
-    create: (
-        $vertex: VertexBuilder,
-        $edge: EdgeBuilder,
-        $push: RawBuilder
-    ) => (
-        name: string, properties?: VProps
-    ) =>
-            $vertex<
+            properties?: Props,
+        ) => CreateEdges,) => {
+            create: VertexCreate<VType, Props, CreateEdges>,
+        },
+    } => ({
+        withFields: <VProps extends Props>() => ({
+            create: (
+                $vertex: VertexBuilder,
+                $edge: EdgeBuilder,
+                $push: RawBuilder
+            ) => (
+                name: string, properties: VProps
+            ) => $vertex<
                 VType,
                 VProps
             >(<VertexLike<VType, VProps>>{
@@ -100,8 +121,66 @@ export const addVertex = <
                 name,
                 type,
                 ...properties
-            })(build ? build({ $vertex, $edge, $push }, name, properties) : <CreateEdges>{}),
-})
+            })({}),
+            andCtor: <CreateEdges>(build: (
+                build: { $vertex: VertexBuilder; $edge: EdgeBuilder; $push: RawBuilder },
+                sourceName: string,
+                properties: VProps,
+            ) => CreateEdges) => ({
+                create: (
+                    $vertex: VertexBuilder,
+                    $edge: EdgeBuilder,
+                    $push: RawBuilder
+                ) => (
+                    name: string, properties: VProps
+                ) => $vertex<
+                    VType,
+                    VProps
+                >(<VertexLike<VType, VProps>>{
+                    id: `${type}/${name}`,
+                    name,
+                    type,
+                    ...properties
+                })(build({ $vertex, $edge, $push }, name, properties)),
+            })
+        }),
+        create: (
+            $vertex: VertexBuilder,
+            $edge: EdgeBuilder,
+            $push: RawBuilder
+        ) => (
+            name: string, properties?: Props
+        ) => $vertex<
+            VType,
+            Props
+        >(<VertexLike<VType, Props>>{
+            id: `${type}/${name}`,
+            name,
+            type,
+            ...properties
+        })({}),
+        withCtor: <CreateEdges>(build: (
+            build: { $vertex: VertexBuilder; $edge: EdgeBuilder; $push: RawBuilder },
+            sourceName: string,
+            properties?: Props,
+        ) => CreateEdges) => ({
+            create: (
+                $vertex: VertexBuilder,
+                $edge: EdgeBuilder,
+                $push: RawBuilder
+            ) => (
+                name: string, properties?: Props
+            ) => $vertex<
+                VType,
+                Props
+            >(<VertexLike<VType, Props>>{
+                id: `${type}/${name}`,
+                name,
+                type,
+                ...properties
+            })(build({ $vertex, $edge, $push }, name, properties)),
+        })
+    })
 
 
 

@@ -1,11 +1,11 @@
 import { DateTime } from "luxon"
-import { VertexRef, objectHash, addVertex, VertexModelRef, dsl } from "@src/design/index"
+import { VertexRef, objectHash, vertex, VertexModelRef, dsl } from "@src/design/index"
 
 // IT People DSL
-const job = addVertex<"job", { level: "junior" | "mid" | "senior" | "principal" }>("job")
-const company = addVertex("company")
-const skill = addVertex("skill")
-const occupation = addVertex("occupation", ({ $edge }, occupationName) => ({
+const job = vertex("job").withFields<{ level: "junior" | "mid" | "senior" }>()
+const company = vertex("company")
+const skill = vertex("skill")
+const occupation = vertex("occupation").withCtor(({ $edge }, occupationName) => ({
     that: {
         mayRequire: (
             _skill: VertexRef<typeof skill>
@@ -16,7 +16,7 @@ const occupation = addVertex("occupation", ({ $edge }, occupationName) => ({
         })
     }
 }))
-const person = addVertex("person", ({ $edge, $push }, personName) => ({
+const person = vertex("person").withCtor(({ $edge, $push }, personName) => ({
     /* contextual edges */
     that: {
         worksAt: (
