@@ -1,19 +1,21 @@
 # Novel Graphic
 
-Novel Graphic is a serverless graph database with a DSL for building typed graphs.
+Novel Graphic is a serverless graph database with a DSL for building strongly typed graphs.
 
 It ships with a SQLite driver and uses [sql.js](https://github.com/sql-js/sql.js/). It can be made to target other SQL databases by writing a driver as well as probably any other kind of storage, locally or remotely.
 
-Because it doesn't depend on database servers, it happily runs in the browser or node.js without any additional dependencies.
+Because it doesn't depend on database servers, it happily runs in both the browser or node.js without any additional dependencies.
 
 # Jump In
 
 ## 1. Design a Domain
 
 ```TypeScript
-const person = vertex<>
+const person = vertex("person").withFields<{ name:string }>()
 
-const openSourceProject = vertex<{ by: string  }>("foss-project"),
+const openSourceProject = vertex("foss-project").withCtor(({ $push }, name, { by }) => {
+
+})
 
 })
 ```

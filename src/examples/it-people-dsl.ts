@@ -5,7 +5,7 @@ import { VertexRef, objectHash, vertex, VertexModelRef, dsl } from "@src/design/
 const job = vertex("job").withFields<{ level: "junior" | "mid" | "senior" }>()
 const company = vertex("company")
 const skill = vertex("skill")
-const occupation = vertex("occupation").withCtor(({ $edge }, occupationName) => ({
+const occupation = vertex("occupation").withApi(({ $edge }, occupationName) => ({
     that: {
         mayRequire: (
             _skill: VertexRef<typeof skill>
@@ -16,7 +16,7 @@ const occupation = vertex("occupation").withCtor(({ $edge }, occupationName) => 
         })
     }
 }))
-const person = vertex("person").withCtor(({ $edge, $push }, personName) => ({
+const person = vertex("person").withApi(({ $edge, $push }, personName) => ({
     /* contextual edges */
     that: {
         worksAt: (

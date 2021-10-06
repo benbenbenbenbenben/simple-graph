@@ -37,7 +37,7 @@ type VertexLike<Type extends string, P extends Record<string, unknown> = Record<
     name: string,
 }
 
-type EdgeLike<T extends string> = { source: string; target: string; type: T }
+type EdgeLike<T extends string, P extends Record<string, unknown> = Record<string, unknown>> = P & { source: string; target: string; type: T }
 
 export type VertexRef<T extends { create: (...args: never[]) => (...args: never[]) => unknown }> = ReturnType<
     ReturnType<T['create']>
@@ -78,8 +78,9 @@ type DomainDefinition<Map extends DomainMap> = {
     dump: () => ({ vertex: VertexLike<string> } | { edge: EdgeLike<string> })[]
 }
 
+type PropType = number | string | boolean | { [x: string]: PropType }
 type Props = {
-    [x: string]: number | string | boolean | Props
+    [x: string]: PropType | PropType[]
 }
 
 export const vertex = <
@@ -87,61 +88,61 @@ export const vertex = <
     >(
         type: VType
     ): {
-        withFields: <VProps extends Props>() => {
-            create: VertexCreateWithFields<VType, VProps>,
-            andCtor: <CreateEdges>(build: (
-                build: { $vertex: VertexBuilder; $edge: EdgeBuilder; $push: RawBuilder },
+        create: VertexCreate<VType, Props>,
+        withFields: <WithFieldsProps extends Props>() => {
+            create: VertexCreateWithFields<VType, WithFieldsProps>,
+            andApi: <WithFieldsAndApiEdges>(build: (
+                build: { $vertex: VertexBuilder; $edge: EdgeBuilder; $push: RawBuilder, $id: string },
                 sourceName: string,
-                properties: VProps,
-            ) => CreateEdges,) => {
-                create: VertexCreateWithFields<VType, VProps, CreateEdges>,
+                properties: WithFieldsProps,
+            ) => WithFieldsAndApiEdges,) => {
+                create: VertexCreateWithFields<VType, WithFieldsProps, WithFieldsAndApiEdges>,
             },
         },
-        create: VertexCreate<VType, Props>,
-        withCtor: <CreateEdges>(build: (
-            build: { $vertex: VertexBuilder; $edge: EdgeBuilder; $push: RawBuilder },
+        withApi: <WithApiEdges>(build: (
+            build: { $vertex: VertexBuilder; $edge: EdgeBuilder; $push: RawBuilder, $id: string },
             sourceName: string,
             properties?: Props,
-        ) => CreateEdges,) => {
-            create: VertexCreate<VType, Props, CreateEdges>,
+        ) => WithApiEdges,) => {
+            create: VertexCreate<VType, Props, WithApiEdges>,
         },
     } => ({
-        withFields: <VProps extends Props>() => ({
+        withFields: <WithFieldsProps extends Props>() => ({
             create: (
                 $vertex: VertexBuilder,
                 $edge: EdgeBuilder,
                 $push: RawBuilder
             ) => (
-                name: string, properties: VProps
+                name: string, properties: WithFieldsProps
             ) => $vertex<
                 VType,
-                VProps
-            >(<VertexLike<VType, VProps>>{
+                WithFieldsProps
+            >(<VertexLike<VType, WithFieldsProps>>{
                 id: `${type}/${name}`,
                 name,
                 type,
                 ...properties
             })({}),
-            andCtor: <CreateEdges>(build: (
-                build: { $vertex: VertexBuilder; $edge: EdgeBuilder; $push: RawBuilder },
+            andApi: <WithFieldsAndApiEdges>(build: (
+                build: { $vertex: VertexBuilder; $edge: EdgeBuilder; $push: RawBuilder, $id: string },
                 sourceName: string,
-                properties: VProps,
-            ) => CreateEdges) => ({
+                properties: WithFieldsProps,
+            ) => WithFieldsAndApiEdges) => ({
                 create: (
                     $vertex: VertexBuilder,
                     $edge: EdgeBuilder,
                     $push: RawBuilder
                 ) => (
-                    name: string, properties: VProps
+                    name: string, properties: WithFieldsProps
                 ) => $vertex<
                     VType,
-                    VProps
-                >(<VertexLike<VType, VProps>>{
+                    WithFieldsProps
+                >(<VertexLike<VType, WithFieldsProps>>{
                     id: `${type}/${name}`,
                     name,
                     type,
                     ...properties
-                })(build({ $vertex, $edge, $push }, name, properties)),
+                })(build({ $vertex, $edge, $push, $id: `${type}/${name}` }, name, properties)),
             })
         }),
         create: (
@@ -159,11 +160,11 @@ export const vertex = <
             type,
             ...properties
         })({}),
-        withCtor: <CreateEdges>(build: (
-            build: { $vertex: VertexBuilder; $edge: EdgeBuilder; $push: RawBuilder },
+        withApi: <WithApiEdges>(build: (
+            build: { $vertex: VertexBuilder; $edge: EdgeBuilder; $push: RawBuilder, $id: string },
             sourceName: string,
             properties?: Props,
-        ) => CreateEdges) => ({
+        ) => WithApiEdges) => ({
             create: (
                 $vertex: VertexBuilder,
                 $edge: EdgeBuilder,
@@ -178,7 +179,7 @@ export const vertex = <
                 name,
                 type,
                 ...properties
-            })(build({ $vertex, $edge, $push }, name, properties)),
+            })(build({ $vertex, $edge, $push, $id: `${type}/${name}` }, name, properties)),
         })
     })
 
