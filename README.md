@@ -11,13 +11,82 @@ Because it doesn't depend on database servers, it happily runs in both the brows
 ## 1. Design a Domain
 
 ```TypeScript
-const person = vertex("person").withFields<{ name:string }>()
+import { dsl, vertex } from "@src/design/index"
+import { createDb } from "@src/index"
 
-const openSourceProject = vertex("foss-project").withCtor(({ $push }, name, { by }) => {
+const person = vertex("person")
+    .withFields<{
+        name: string
+    }>()
 
-})
+const openSourceProject = vertex("foss-project")
+    .withFields<{
+        authoredBy: string[]
+    }>()
+    .andApi(
+        ({ $push, $id }) => {
+            const andIsA = {
+                isA: (typeOfProject: string) => {
+                    $push({
+                        edge: {
+                            source: $id,
+                            type: "isTypeOf",
+                            target: `software-category/${typeOfProject}`
+                        }
+                    })
+                    const that = {
+                        isForkedFrom: (aParentProject: string, { by, www }: { by: string, www: string }) => {
+                            $push({
+                                vertex: {
+                                    id: `foss-project/${aParentProject}`,
+                                    type: `foss-project`,
+                                    by,
+                                    www,
+                                }
+                            })
+                            $push({
+                                edge: {
+                                    source: $id,
+                                    type: "isForkOf",
+                                    target: `foss-project/${aParentProject}`
+                                }
+                            })
+                            return { and: { ...that, ...andIsA } }
+                        },
+                        isInspiredBy: (someWebpages: Record<string, { www: string }>) => {
+                            for (const webpageTitle in someWebpages) {
+                                $push({
+                                    vertex: {
+                                        type: `webpage`,
+                                        id: `webpage/${webpageTitle}`,
+                                        title: webpageTitle,
+                                        url: someWebpages[webpageTitle].www
+                                    }
+                                })
+                                $push({
+                                    edge: {
+                                        source: $id,
+                                        type: "isInspiredBy",
+                                        target: `webpage/${webpageTitle}`,
+                                    }
+                                })
+                            }
+                            return { and: { ...that, ...andIsA } }
+                        }
+                    }
+                    return { that }
+                }
+            }
+            return andIsA
+        }
+    )
 
-})
+
+export const foss = dsl({
+    person,
+    openSourceProject
+})(createDb())
+
 ```
 
 ## 2. Use a Domain

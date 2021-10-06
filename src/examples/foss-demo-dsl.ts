@@ -69,7 +69,7 @@ const openSourceProject = vertex("foss-project")
     )
 
 
-const foss = dsl({
+export const foss = dsl({
     person,
     openSourceProject
 })(createDb())

@@ -31,6 +31,9 @@ type RawBuilder = <T extends {
     edge: EdgeLike<string>
 }>(...items: T[]) => T[]
 
+type PushVertex<T extends string, P extends Props, V = VertexLike<T, P>> = (...items: V[]) => V[]
+type PushEdge<T extends string, P extends Props, V = EdgeLike<T, P>> = (...items: V[]) => V[]
+
 type VertexLike<Type extends string, P extends Record<string, unknown> = Record<string, unknown>> = P & {
     id: string
     type: Type
@@ -47,28 +50,30 @@ export type VertexModelRef<
     T extends { create: (...args: never[]) => (...args: never[]) => { vertex: VertexLike<string> } },
     > = ReturnType<ReturnType<T['create']>>['vertex']
 
-type VertexCreate<
+type VertexCompile<
     VType extends string,
     VProps extends Props = any,
-    Edges = Record<string, unknown>
     > = (
-        vertex: VertexBuilder, edge: EdgeBuilder, raw: RawBuilder
-    ) => (name: string, properties?: VProps) => VertexFindOrCreate<VertexLike<VType, VProps>, Edges>
+        $vert: PushVertex<VType, VProps>,
+        $edge: PushEdge<any, any>,
+    ) => (
+            name: string, properties?: VProps
+        ) => VertexLike<VType, VProps>[]
 
-type VertexCreateWithFields<
+type VertexCompileWithFields<
     VType extends string,
     VProps extends Props = any,
-    Edges = Record<string, unknown>
     > = (
-        vertex: VertexBuilder, edge: EdgeBuilder, raw: RawBuilder
+        $vert: PushVertex<VType, VProps>,
+        $edge: PushEdge<any, any>,
     ) => (
             name: string, properties: VProps
-        ) => VertexFindOrCreate<VertexLike<VType, VProps>, Edges>
+        ) => VertexLike<VType, VProps>[]
 
 
 type DomainMap = {
     [typeName: string]: {
-        create: VertexCreate<typeof typeName>
+        create: VertexCompile<typeof typeName> | VertexCompileWithFields<typeof typeName>
     }
 }
 
@@ -83,103 +88,67 @@ type Props = {
     [x: string]: PropType | PropType[]
 }
 
+type CreateQueryBuilder<SourceProps extends Props | undefined, Output> = (
+    build: { $push: RawBuilder, $id: string },
+    sourceName: string,
+    properties: SourceProps,
+) => Output
+
+type VertexCompilation<VType extends string> = {
+    create: VertexCompile<VType, Props>,
+    withFields: <WithFieldsProps extends Props>() => {
+        create: VertexCompileWithFields<VType, WithFieldsProps>,
+        andApi: <WithFieldsAndApiOutput>(
+            build: CreateQueryBuilder<WithFieldsProps, WithFieldsAndApiOutput>
+        ) => {
+            create: VertexCompileWithFields<VType, WithFieldsProps>,
+        },
+    },
+    withApi: <WithApiEdges>(build: (
+        build: { $push: RawBuilder, $id: string },
+        sourceName: string,
+        properties?: Props,
+    ) => WithApiEdges,) => {
+        create: VertexCompile<VType, Props>,
+    },
+}
+
+// vertex compiler
+const _create = <T extends string, P extends Props = any>(
+    type: T
+) => (
+    $vert: PushVertex<T, P>
+) => (
+    name: string, properties?: P
+) => $vert(<VertexLike<T, P>>{
+    id: `${type}/${name}`,
+    name,
+    type,
+    ...properties
+})
+
 export const vertex = <
     VType extends string,
     >(
         type: VType
-    ): {
-        create: VertexCreate<VType, Props>,
-        withFields: <WithFieldsProps extends Props>() => {
-            create: VertexCreateWithFields<VType, WithFieldsProps>,
-            andApi: <WithFieldsAndApiEdges>(build: (
-                build: { $vertex: VertexBuilder; $edge: EdgeBuilder; $push: RawBuilder, $id: string },
-                sourceName: string,
-                properties: WithFieldsProps,
-            ) => WithFieldsAndApiEdges,) => {
-                create: VertexCreateWithFields<VType, WithFieldsProps, WithFieldsAndApiEdges>,
-            },
-        },
-        withApi: <WithApiEdges>(build: (
-            build: { $vertex: VertexBuilder; $edge: EdgeBuilder; $push: RawBuilder, $id: string },
-            sourceName: string,
-            properties?: Props,
-        ) => WithApiEdges,) => {
-            create: VertexCreate<VType, Props, WithApiEdges>,
-        },
-    } => ({
+    ): VertexCompilation<VType> => ({
         withFields: <WithFieldsProps extends Props>() => ({
-            create: (
-                $vertex: VertexBuilder,
-                $edge: EdgeBuilder,
-                $push: RawBuilder
-            ) => (
-                name: string, properties: WithFieldsProps
-            ) => $vertex<
-                VType,
-                WithFieldsProps
-            >(<VertexLike<VType, WithFieldsProps>>{
-                id: `${type}/${name}`,
-                name,
-                type,
-                ...properties
-            })({}),
-            andApi: <WithFieldsAndApiEdges>(build: (
+            create: _create(type),
+            andApi: <WithFieldsAndApiOutput>(build: (
                 build: { $vertex: VertexBuilder; $edge: EdgeBuilder; $push: RawBuilder, $id: string },
                 sourceName: string,
                 properties: WithFieldsProps,
-            ) => WithFieldsAndApiEdges) => ({
-                create: (
-                    $vertex: VertexBuilder,
-                    $edge: EdgeBuilder,
-                    $push: RawBuilder
-                ) => (
-                    name: string, properties: WithFieldsProps
-                ) => $vertex<
-                    VType,
-                    WithFieldsProps
-                >(<VertexLike<VType, WithFieldsProps>>{
-                    id: `${type}/${name}`,
-                    name,
-                    type,
-                    ...properties
-                })(build({ $vertex, $edge, $push, $id: `${type}/${name}` }, name, properties)),
+            ) => WithFieldsAndApiOutput) => ({
+                create: _create(type),
             })
-        }),
-        create: (
-            $vertex: VertexBuilder,
-            $edge: EdgeBuilder,
-            $push: RawBuilder
-        ) => (
-            name: string, properties?: Props
-        ) => $vertex<
-            VType,
-            Props
-        >(<VertexLike<VType, Props>>{
-            id: `${type}/${name}`,
-            name,
-            type,
-            ...properties
-        })({}),
+        }), 
+        create: _create(type),
         withApi: <WithApiEdges>(build: (
             build: { $vertex: VertexBuilder; $edge: EdgeBuilder; $push: RawBuilder, $id: string },
             sourceName: string,
             properties?: Props,
         ) => WithApiEdges) => ({
-            create: (
-                $vertex: VertexBuilder,
-                $edge: EdgeBuilder,
-                $push: RawBuilder
-            ) => (
-                name: string, properties?: Props
-            ) => $vertex<
-                VType,
-                Props
-            >(<VertexLike<VType, Props>>{
-                id: `${type}/${name}`,
-                name,
-                type,
-                ...properties
-            })(build({ $vertex, $edge, $push, $id: `${type}/${name}` }, name, properties)),
+            create: _create(type),
         })
     })
 
