@@ -40,17 +40,19 @@ type VertexLike<Type extends string, P extends Props = Props> = P & {
     name: string,
 }
 
-type EdgeLike<Type extends string, P extends Props = Props> = P & { 
-    source: string; 
-    type: Type 
-    target: string; 
+type EdgeLike<Type extends string, P extends Props = Props> = P & {
+    source: string;
+    type: Type
+    target: string;
 }
 
 export type VertexRef<T extends { create: (...args: never[]) => (...args: never[]) => unknown }> = ReturnType<
     ReturnType<T['create']>
 >
 
-export type VertexModelRef<T extends VertexCompiler, R = ReturnType<ReturnType<ReturnType<ReturnType<T>["withFields"]>["create"]>>[0]> = R;
+export type VertexModelRef<T> = T extends VertexCompilation<string>
+    ? ReturnType<ReturnType<ReturnType<T["withFields"]>["create"]>>[0]
+    : never
 
 type VertexCompile<
     VType extends string,
@@ -90,13 +92,13 @@ type Props = {
     [x: string]: PropType | PropType[]
 }
 
-type CreateQueryBuilder<VType extends string, SourceProps extends Props> = <Output>(
+type CreateQueryBuilder<VType extends string, SourceProps extends Props> = (
     $vert: PushVertex,
     $edge: PushEdge,
     sourceName: string,
     properties: SourceProps,
     ...created: VertexLike<VType, SourceProps>[]
-) => Output
+) => any
 
 type VertexCompilation<VType extends string> = {
     create: VertexCompile<VType, Props>,
