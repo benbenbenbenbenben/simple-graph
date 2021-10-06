@@ -28,34 +28,36 @@ type EdgeBuilder = <
 type RawBuilder = <T extends {
     vertex: VertexLike<string, any>
 } | {
-    edge: EdgeLike<string>
+    edge: EdgeLike<string, any>
 }>(...items: T[]) => T[]
 
-type PushVertex<T extends string, P extends Props, V = VertexLike<T, P>> = (...items: V[]) => V[]
-type PushEdge<T extends string, P extends Props, V = EdgeLike<T, P>> = (...items: V[]) => V[]
+type PushVertex = <T extends string, P extends Props, V = VertexLike<T, P>>(...items: V[]) => V[]
+type PushEdge = <T extends string, P extends Props, E = EdgeLike<T, P>>(...items: E[]) => E[]
 
-type VertexLike<Type extends string, P extends Record<string, unknown> = Record<string, unknown>> = P & {
+type VertexLike<Type extends string, P extends Props = Props> = P & {
     id: string
     type: Type
     name: string,
 }
 
-type EdgeLike<T extends string, P extends Record<string, unknown> = Record<string, unknown>> = P & { source: string; target: string; type: T }
+type EdgeLike<Type extends string, P extends Props = Props> = P & { 
+    source: string; 
+    type: Type 
+    target: string; 
+}
 
 export type VertexRef<T extends { create: (...args: never[]) => (...args: never[]) => unknown }> = ReturnType<
     ReturnType<T['create']>
 >
 
-export type VertexModelRef<
-    T extends { create: (...args: never[]) => (...args: never[]) => { vertex: VertexLike<string> } },
-    > = ReturnType<ReturnType<T['create']>>['vertex']
+export type VertexModelRef<T extends VertexCompiler, R = ReturnType<ReturnType<ReturnType<ReturnType<T>["withFields"]>["create"]>>[0]> = R;
 
 type VertexCompile<
     VType extends string,
     VProps extends Props = any,
     > = (
-        $vert: PushVertex<VType, VProps>,
-        $edge: PushEdge<any, any>,
+        $vert: PushVertex,
+        $edge: PushEdge,
     ) => (
             name: string, properties?: VProps
         ) => VertexLike<VType, VProps>[]
@@ -64,8 +66,8 @@ type VertexCompileWithFields<
     VType extends string,
     VProps extends Props = any,
     > = (
-        $vert: PushVertex<VType, VProps>,
-        $edge: PushEdge<any, any>,
+        $vert: PushVertex,
+        $edge: PushEdge,
     ) => (
             name: string, properties: VProps
         ) => VertexLike<VType, VProps>[]
@@ -88,36 +90,36 @@ type Props = {
     [x: string]: PropType | PropType[]
 }
 
-type CreateQueryBuilder<SourceProps extends Props | undefined, Output> = (
-    build: { $push: RawBuilder, $id: string },
+type CreateQueryBuilder<VType extends string, SourceProps extends Props> = <Output>(
+    $vert: PushVertex,
+    $edge: PushEdge,
     sourceName: string,
     properties: SourceProps,
+    ...created: VertexLike<VType, SourceProps>[]
 ) => Output
 
 type VertexCompilation<VType extends string> = {
     create: VertexCompile<VType, Props>,
     withFields: <WithFieldsProps extends Props>() => {
         create: VertexCompileWithFields<VType, WithFieldsProps>,
-        andApi: <WithFieldsAndApiOutput>(
-            build: CreateQueryBuilder<WithFieldsProps, WithFieldsAndApiOutput>
+        andApi: (
+            build: CreateQueryBuilder<VType, WithFieldsProps>
         ) => {
             create: VertexCompileWithFields<VType, WithFieldsProps>,
         },
     },
-    withApi: <WithApiEdges>(build: (
-        build: { $push: RawBuilder, $id: string },
-        sourceName: string,
-        properties?: Props,
-    ) => WithApiEdges,) => {
-        create: VertexCompile<VType, Props>,
+    withApi: (
+        build: CreateQueryBuilder<VType, Props>
+    ) => {
+        create: VertexCompileWithFields<VType, Props>,
     },
 }
 
 // vertex compiler
-const _create = <T extends string, P extends Props = any>(
+const _create = <T extends string, P extends Props = Props>(
     type: T
 ) => (
-    $vert: PushVertex<T, P>
+    $vert: PushVertex
 ) => (
     name: string, properties?: P
 ) => $vert(<VertexLike<T, P>>{
@@ -127,28 +129,39 @@ const _create = <T extends string, P extends Props = any>(
     ...properties
 })
 
-export const vertex = <
+type VertexCompiler = <VType extends string>(type: VType) => VertexCompilation<VType>
+
+export const vertex: VertexCompiler = <
     VType extends string,
     >(
         type: VType
     ): VertexCompilation<VType> => ({
         withFields: <WithFieldsProps extends Props>() => ({
             create: _create(type),
-            andApi: <WithFieldsAndApiOutput>(build: (
-                build: { $vertex: VertexBuilder; $edge: EdgeBuilder; $push: RawBuilder, $id: string },
-                sourceName: string,
-                properties: WithFieldsProps,
-            ) => WithFieldsAndApiOutput) => ({
-                create: _create(type),
+            andApi: (build: CreateQueryBuilder<VType, WithFieldsProps>) => ({
+                create: (
+                    $vert: PushVertex,
+                    $edge: PushEdge,
+                ) => (
+                    name: string, properties: any
+                ) => build(
+                    $vert, $edge, name, properties,
+                    ..._create<VType, WithFieldsProps>(type)($vert)(name, properties)
+                )
+
             })
-        }), 
+        }),
         create: _create(type),
-        withApi: <WithApiEdges>(build: (
-            build: { $vertex: VertexBuilder; $edge: EdgeBuilder; $push: RawBuilder, $id: string },
-            sourceName: string,
-            properties?: Props,
-        ) => WithApiEdges) => ({
-            create: _create(type),
+        withApi: (build: CreateQueryBuilder<VType, Props>) => ({
+            create: (
+                $vert: PushVertex,
+                $edge: PushEdge,
+            ) => (
+                name: string, properties: any
+            ) => build(
+                $vert, $edge, name, properties,
+                ..._create<VType, Props>(type)($vert)(name, properties)
+            )
         })
     })
 
@@ -168,26 +181,15 @@ export const createActivity = <
             updatesStrings.push(...itemsToPush.map((item) => JSON.stringify(item)))
             return itemsToPush
         }
-        const $vertex =
-            <
-                VertexType extends string,
-                Properties extends Record<string, unknown>,
-                VLike = VertexLike<VertexType, Properties>
-            >(
-                vertex: VLike,
-            ) =>
-                <Edges>(edges: Edges): VertexFindOrCreate<VLike, Edges> => {
-                    $push({ vertex })
-                    return {
-                        vertex: vertex,
-                        ...edges,
-                    }
-                }
-        const $edge: EdgeBuilder = <EdgeType extends string, T>(edge: EdgeLike<EdgeType>, vertexTargets?: T): T => {
-            $push({ edge })
-            /* TODO: without this annotation there is a ts2322 */
-            return <T>vertexTargets
-        }
+
+        const $vert: PushVertex = <
+            T extends string, P extends Props, V = VertexLike<T, P>
+        >(...items: V[]) => $push(...items.map(v => ({ vertex: v }))).map(vv => vv.vertex)
+
+        const $edge: PushEdge = <
+            T extends string, P extends Props, E = EdgeLike<T, P>
+        >(...items: E[]) => $push(...items.map(e => ({ edge: e }))).map(ee => ee.edge)
+
         // company: company.create($vertex, $edge, <RawBuilder>$push),
         // skill: skill.create($vertex, $edge, <RawBuilder>$push),
         // person: person.create($vertex, $edge, <RawBuilder>$push),
@@ -195,7 +197,7 @@ export const createActivity = <
         //...Object.entries(map).reduce((aggr, [type, { create }]) => ({ [type]: create($vertex, $edge, <RawBuilder>$push) }), {}),
 
         const definition = Object.entries(map).reduce(
-            (a, [n, { create }]) => ({ ...a, [n]: create($vertex, $edge, $push) }),
+            (a, [n, { create }]) => ({ ...a, [n]: create($vert, $edge) }),
             <DomainDefinition<Map>>{
                 dump: () => [...updates]
             })
@@ -254,7 +256,7 @@ type FindOneOrManyAPI<V> = {
 
 
 type FindOneOrManyMap<Map extends DomainMap> = {
-    [key in keyof Map]: FindOneOrManyAPI<ReturnType<ReturnType<Map[key]['create']>>['vertex']>
+    [key in keyof Map]: FindOneOrManyAPI<ReturnType<ReturnType<Map[key]['create']>>>
 }
 
 export const findActivityNodeOneOrMany = <VLike extends VertexLike<string>>(
@@ -316,7 +318,7 @@ export const dsl = <Map extends DomainMap>(
         find: <FindOneOrManyMap<Map>>findActivity(database, (_one, _many) =>
             Object.entries(domain).reduce((fa, [n, { create }]) => ({
                 ...fa,
-                [n]: findActivityNodeOneOrMany<ReturnType<ReturnType<typeof create>>["vertex"]>(n, _one, _many),
+                [n]: findActivityNodeOneOrMany<ReturnType<ReturnType<typeof create>>[0]>(n, _one, _many),
             }), {})
         )
     })

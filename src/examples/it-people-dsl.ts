@@ -5,7 +5,7 @@ import { VertexRef, objectHash, vertex, VertexModelRef, dsl } from "@src/design/
 const job = vertex("job").withFields<{ level: "junior" | "mid" | "senior" }>()
 const company = vertex("company")
 const skill = vertex("skill")
-const occupation = vertex("occupation").withApi(({ $edge }, occupationName) => ({
+const occupation = vertex("occupation").withApi(($vert, $edge, occupationName) => ({
     that: {
         mayRequire: (
             _skill: VertexRef<typeof skill>
