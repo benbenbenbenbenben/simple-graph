@@ -42,7 +42,7 @@ const vertex = <N extends string = "", NS extends string = "">(
 ) => {
     return {
         as: <P extends Props | undefined = undefined>(defaultProps?: P) => {
-            type Creator = P extends undefined ? (props?: Extendable<Props>) => VertexModel<N, NS, Extendable<Props>> : (props: Extendable<P>) => VertexModel<N, NS, Extendable<P>>
+            type Creator = P extends undefined ? <C extends Props>(props?: Extendable<C>) => VertexModel<N, NS, Extendable<C>> : <C extends P>(props: Extendable<C>) => VertexModel<N, NS, Extendable<C>>
             type Descriptor = VertexDescriptor<N, NS, P extends undefined ? Props : P>
             return {
                 describe: {
