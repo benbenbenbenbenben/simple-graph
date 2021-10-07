@@ -64,8 +64,6 @@ type VertexDescriptor<
         $props: P,
     }
 
-
-
 const vertex = <N extends string = "", NS extends string = "">(
     name: N, ns?: NS
 ) => {
@@ -139,29 +137,42 @@ const edge = <N extends string = "", NS extends string = "">(
 const person = vertex("person").as()
 const company = vertex("company").as()
 const worksFor = edge("worksFor").from(person).to(company).as()
+const employs = edge("employs").from(company).to(person).as()
 
 const bob = person.new({ name: "Bob" })
 const acme = company.new({ name: "Acme" })
 
 //insert(bob, [worksFor, acme])
 
+type EdgeToVertices = [
+    edge: EdgeModel | EdgeDescriptor | { describe: EdgeDescriptor },
+    target: (
+        VertexModel |
+        VertexModel[] |
+        [
+            VertexModel,
+            EdgeToVertices
+        ]
+    )
+]
+
 const insert = <
     V extends VertexModel,
-    E extends EdgeModel | { describe: EdgeDescriptor },
-    VT extends VertexModel>(
-        single: V, double?: [e: E, t: VT]
+    VT extends EdgeToVertices>(
+        single: V, double?: VT
     ) => {
-    single // ?
-    !double || double[0] // ?
-    !double || double[1] // ?
-
+    if (double) {
+        return [single, ...double]
+    } else {
+        return single
+    }
 }
 
 insert(bob) // ?
 insert(bob, [worksFor.new(), acme]) // ?
 insert(acme, [worksFor, bob]) // ?
 
-
+insert(bob, [worksFor, [acme, [employs, bob]]])
 // const insert = <A>(a: A) => {
 
 // }
