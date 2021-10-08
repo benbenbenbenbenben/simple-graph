@@ -75,15 +75,15 @@ const vertex = <N extends string = "", NS extends string = "">(
                 describe: {
                     $id: "$automatic" as const,
                     $type: "vertex" as const,
-                    $name: name as N,
+                    $name: name,
                     $ns: ns || "" as NS,
                     $props: (defaultProps || {}) as Extendable<(P extends undefined ? Props : P)>,
                 } as Descriptor,
                 new: ((props: P) => {
                     return {
-                        $id: "$automatic" as const,
+                        $id: "$automatic",
                         $type: "vertex" as const,
-                        $name: name as N,
+                        $name: name,
                         $ns: ns || "" as NS,
                         $props: props || defaultProps || {} as Extendable<P>,
                     }
@@ -108,7 +108,7 @@ const edge = <N extends string = "", NS extends string = "">(
                                 describe: {
                                     $id: "$automatic" as const,
                                     $type: "edge" as const,
-                                    $name: name as N,
+                                    $name: name,
                                     $ns: ns || "" as NS,
                                     $props: (defaultProps || {}) as Extendable<(P extends undefined ? Props : P)>,
                                     $source: "describe" in source ? source.describe : source,
@@ -116,9 +116,9 @@ const edge = <N extends string = "", NS extends string = "">(
                                 } as Descriptor,
                                 new: ((props: P) => {
                                     return {
-                                        $id: "$automatic" as const,
+                                        $id: "$automatic",
                                         $type: "edge" as const,
-                                        $name: name as N,
+                                        $name: name,
                                         $ns: ns || "" as NS,
                                         $props: props || defaultProps || {} as Extendable<P>,
                                     }
@@ -143,26 +143,23 @@ const bob = person.new({ name: "Bob" })
 const acme = company.new({ name: "Acme" })
 
 //insert(bob, [worksFor, acme])
-type ExtractEdgeDescriptor<E extends EdgeDescriptor | { describe: EdgeDescriptor }> = E extends { describe: EdgeDescriptor } ? E["describe"] : E
 
-type EdgeToVertices<S extends VertexModel, E extends EdgeDescriptor, T extends VertexModel = any> =
-    S["$name"] extends E["$source"]["$name"] ?
-    S["$ns"] extends E["$source"]["$ns"] ?
-    E["$target"]["$name"] extends T["$name"] ?
-    E["$target"]["$ns"] extends T["$ns"] ?
-    [
-        edge: E,
-        target: T
-    ] :
-    { ERROR: "target and edge.target $ns values are not alike" } :
-    { ERROR: "target and edge.target $name values are not alike" } :
-    { ERROR: "source and edge.source $ns values are not alike" } :
-    { ERROR: "source and edge.source $name values are not alike" };
+type EdgeToVertices = [
+    edge: EdgeModel | EdgeDescriptor | { describe: EdgeDescriptor },
+    target: (
+        VertexModel |
+        VertexModel[] |
+        [
+            VertexModel,
+            EdgeToVertices
+        ]
+    )
+] | EdgeToVertices[]
 
 const insert = <
     V extends VertexModel,
-    E extends EdgeDescriptor>(
-        single: V, double?: EdgeToVertices<V, E>
+    VT extends EdgeToVertices>(
+        single: V, double?: VT
     ) => {
     if (double) {
         return [single, ...double]
@@ -172,10 +169,18 @@ const insert = <
 }
 
 insert(bob) // ?
-insert(bob, [worksFor.describe, acme]) // ?
-insert(acme, [worksFor.describe, bob]) // ?
+insert(bob, [worksFor.new(), acme]) // ?
+insert(acme, [worksFor, bob]) // ?
 
-insert(bob, [worksFor, acme])
+insert(bob, [worksFor, [acme, [employs, bob]]])
+insert(bob, [
+    [worksFor, [acme]],
+    [worksFor, [acme, acme, acme]],
+    [worksFor, acme],
+    [worksFor, [acme,
+        [employs, bob]]
+    ],
+])
 // const insert = <A>(a: A) => {
 
 // }
