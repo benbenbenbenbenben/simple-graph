@@ -222,13 +222,10 @@ const one = createCallableType(() => 1, { x: 1 })
 one.x //?
 one //?
 const where = (triple: TripleWhere, ...traverse: TripleWhere[]) => {
-
-    const next = createCallableType(where, {
-        select: (map: any) => {
-            return triple
-        }
-    })
-    return next
+    const select = (map: any) => {
+        return triple
+    }
+    return { select }
 }
 
 const isTypeOf = edge("isTypeOf")
