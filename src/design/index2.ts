@@ -102,7 +102,18 @@ const vertex = <N extends string = "", NS extends string = "">(
 const edge = <N extends string = "", NS extends string = "", IN extends string = `inverse(${N})`>(
     name: N, ns?: NS, inverseName?: IN
 ) => {
+    type Descriptor = EdgeDescriptor<N, NS, IN, Extendable<Props>>
     return {
+        describe: {
+            $id: "$automatic" as const,
+            $type: "edge" as const,
+            $name: name,
+            $inverseName: inverseName,
+            $ns: ns || "" as NS,
+            $props: {} as Extendable<Props>,
+            $source: undefined,
+            $target: undefined,
+        } as Descriptor,
         from: <SD extends VertexDescriptor>(source: { describe: SD } | SD) => {
             return {
                 to: <TD extends VertexDescriptor>(target: { describe: TD } | TD) => {
@@ -196,17 +207,27 @@ const createCallableType = <F extends (...args: any[]) => any, I extends any>(f:
     Object.assign(f, i)
     return f as CallableType<F, I>
 }
-
-type NamedEdge<N extends string, > = {}
+type Described = { describe: VertexDescriptor | EdgeDescriptor }
+type TripleWhere = [
+    Described, string | Described, string | Described
+] | [
+    string | Described, Described, string | Described
+] | [
+    string | Described, string | Described, Described
+] | [
+    Described, Described, Described /* traversal */
+]
 
 const one = createCallableType(() => 1, { x: 1 })
 one.x //?
 one //?
-const where = (x: NamedEdge, y: any, _stack = []) => {
+const where = (triple: TripleWhere, ...traverse: TripleWhere[]) => {
 
-
-
-    const next = createCallableType(where, { select: (map: any) => true })
+    const next = createCallableType(where, {
+        select: (map: any) => {
+            return triple
+        }
+    })
     return next
 }
 
@@ -217,11 +238,9 @@ const hasMailbox = edge("hasMailbox")
 const as = <N extends string>() => true
 
 where(
-    { subject: isTypeOf }, person
-)(
-    { subject: hasName }, as<"name">()
-)(
-    { subject: hasMailbox }, as<"email">()
+    ["subject", isTypeOf, person],
+    ["subject", hasName, "name"],
+    ["subject", hasMailbox, "name"]
 ).select({
     name: toString,
     email: toString
