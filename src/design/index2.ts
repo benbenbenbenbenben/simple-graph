@@ -15,10 +15,12 @@ type KnownTargets = {
 type EdgeModel<
     Name extends string = string,
     Namespace extends string = string,
+    InverseName extends string = `inverse(${Name})`,
     KnownProps extends Props | undefined = any,
     > = {
         $type: "edge"
         $name: Name
+        $inverseName: InverseName
         $ns: Namespace
         $props: Extendable<KnownProps extends undefined ? (Props | undefined) : KnownProps>
     }
@@ -26,12 +28,14 @@ type EdgeModel<
 type EdgeDescriptor<
     N extends string = string,
     NS extends string = string,
+    IN extends string = `inverse(${N})`,
     P extends Extendable<Props> = any,
     SD extends VertexDescriptor = any,
     TD extends VertexDescriptor = any> = {
         $id: string
         $type: "edge",
         $name: N,
+        $inverseName: IN,
         $ns: NS,
         $props: P,
         $source: SD
@@ -93,8 +97,8 @@ const vertex = <N extends string = "", NS extends string = "">(
     }
 }
 
-const edge = <N extends string = "", NS extends string = "">(
-    name: N, ns?: NS
+const edge = <N extends string = "", NS extends string = "", IN extends string = `inverse(${N})`>(
+    name: N, ns?: NS, inverseName?: IN
 ) => {
     return {
         from: <SD extends VertexDescriptor>(source: { describe: SD } | SD) => {
@@ -102,13 +106,14 @@ const edge = <N extends string = "", NS extends string = "">(
                 to: <TD extends VertexDescriptor>(target: { describe: TD } | TD) => {
                     return {
                         as: <P extends Props | undefined = undefined>(defaultProps?: P) => {
-                            type Creator = P extends undefined ? <C extends Props>(props?: Extendable<C>) => EdgeModel<N, NS, Extendable<C>> : <C extends P>(props: Extendable<C>) => EdgeModel<N, NS, Extendable<C>>
-                            type Descriptor = EdgeDescriptor<N, NS, Extendable<(P extends undefined ? Props : P)>, SD, TD>
+                            type Creator = P extends undefined ? <C extends Props>(props?: Extendable<C>) => EdgeModel<N, NS, IN, Extendable<C>> : <C extends P>(props: Extendable<C>) => EdgeModel<N, NS, IN, Extendable<C>>
+                            type Descriptor = EdgeDescriptor<N, NS, IN, Extendable<(P extends undefined ? Props : P)>, SD, TD>
                             return {
                                 describe: {
                                     $id: "$automatic" as const,
                                     $type: "edge" as const,
                                     $name: name,
+                                    $inverseName: inverseName,
                                     $ns: ns || "" as NS,
                                     $props: (defaultProps || {}) as Extendable<(P extends undefined ? Props : P)>,
                                     $source: "describe" in source ? source.describe : source,
@@ -119,6 +124,7 @@ const edge = <N extends string = "", NS extends string = "">(
                                         $id: "$automatic",
                                         $type: "edge" as const,
                                         $name: name,
+                                        $inverseName: inverseName,
                                         $ns: ns || "" as NS,
                                         $props: props || defaultProps || {} as Extendable<P>,
                                     }
