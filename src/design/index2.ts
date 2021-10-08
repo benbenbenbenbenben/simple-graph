@@ -197,11 +197,17 @@ const createCallableType = <F extends (...args: any[]) => any, I extends any>(f:
     return f as CallableType<F, I>
 }
 
+type NamedEdge<N extends string, > = {}
+
 const one = createCallableType(() => 1, { x: 1 })
 one.x //?
 one //?
-const where = (x: any, y: any) => {
-    return createCallableType(where, { select: (map: any) => true })
+const where = (x: NamedEdge, y: any, _stack = []) => {
+
+
+
+    const next = createCallableType(where, { select: (map: any) => true })
+    return next
 }
 
 const isTypeOf = edge("isTypeOf")
