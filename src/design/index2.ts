@@ -142,7 +142,7 @@ const employs = edge("employs").from(company).to(person).as()
 const bob = person.new({ name: "Bob" })
 const acme = company.new({ name: "Acme" })
 
-//insert(bob, [worksFor, acme])
+//insert(bob, [worksFor, acme)
 
 type EdgeToVertices = [
     edge: EdgeModel | EdgeDescriptor | { describe: EdgeDescriptor },
@@ -159,7 +159,8 @@ type EdgeToVertices = [
 const insert = <
     V extends VertexModel,
     VT extends EdgeToVertices>(
-        single: V, double?: VT
+        single: VertexModel, double?: EdgeToVertices,
+        ...triple: [restsingle: V, restdouble?: VT][]
     ) => {
     if (double) {
         return [single, ...double]
@@ -170,7 +171,9 @@ const insert = <
 
 insert(bob) // ?
 insert(bob, [worksFor.new(), acme]) // ?
-insert(acme, [worksFor, bob]) // ?
+insert(acme, [worksFor, bob], [
+    bob, []
+]) // ?
 
 insert(bob, [worksFor, [acme, [employs, bob]]])
 insert(bob, [
