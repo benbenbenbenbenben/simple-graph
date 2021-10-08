@@ -1,3 +1,5 @@
+import { whereClauseToSql } from "@src/index"
+
 type PropType = number | string | boolean | { [x: string]: PropType }
 type Props = {
     [x: string]: PropType | PropType[]
@@ -148,8 +150,6 @@ const employs = edge("employs").from(company).to(person).as()
 const bob = person.new({ name: "Bob" })
 const acme = company.new({ name: "Acme" })
 
-//insert(bob, [worksFor, acme)
-
 type EdgeToVertices = [
     edge: EdgeModel | EdgeDescriptor | { describe: EdgeDescriptor },
     target: (
@@ -190,28 +190,59 @@ insert(bob, [
         [employs, bob]]
     ],
 ])
-// const insert = <A>(a: A) => {
 
-// }
+type CallableType<F extends (...args: any[]) => any, I extends any> = F & I
+const createCallableType = <F extends (...args: any[]) => any, I extends any>(f: F, i: I): CallableType<F, I> => {
+    Object.assign(f, i)
+    return f as CallableType<F, I>
+}
 
-// const update = <A>(a: A) => {
+const one = createCallableType(() => 1, { x: 1 })
+one.x //?
+one //?
+const where = (x: any, y: any) => {
+    return createCallableType(where, { select: (map: any) => true })
+}
 
-// }
+const isTypeOf = edge("isTypeOf")
+const hasName = edge("hasName")
+const hasMailbox = edge("hasMailbox")
 
-// const merge = <A>(a: A) => {
+const as = <N extends string>() => true
 
-// }
+where(
+    { subject: isTypeOf }, person
+)(
+    { subject: hasName }, as<"name">()
+)(
+    { subject: hasMailbox }, as<"email">()
+).select({
+    name: toString,
+    email: toString
+}) // ?
 
-// const drop = (id: string) => {
 
-// }
 
-// const connect = <A, B, AtoB, BtoA, P>({ from: A, to: B, as: [AtoB, BtoA], with: P }) => {
-
-// }
-
-// const disconnect = (id: string) => {
-
-// }
-
-// type eee = { connect: person, to: company, as: { person: "worksAt", company: "employs", with: { props: { since: string } } } }
+/*
+PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+SELECT ?name
+       ?email
+WHERE
+  {
+    ?person  a          foaf:Person .
+    ?person  foaf:name  ?name .
+    ?person  foaf:mbox  ?email .
+  }
+*/
+/*
+PREFIX ex: <http://example.com/exampleOntology#>
+SELECT ?capital
+       ?country
+WHERE
+  {
+    ?x  ex:cityname       ?capital   ;
+        ex:isCapitalOf    ?y         . // ?x is implicit subject
+    ?y  ex:countryname    ?country   ;
+        ex:isInContinent  ex:Africa  . // ?x is implicit subject
+  }
+*/
