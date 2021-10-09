@@ -221,29 +221,20 @@ type TripleWhere = [
 const one = createCallableType(() => 1, { x: 1 })
 one.x //?
 one //?
-const where = (triple: TripleWhere, ...traverse: TripleWhere[]) => {
-    const select = (map: any) => {
-        return triple
-    }
-    return { select }
-}
 
 const isTypeOf = edge("isTypeOf")
 const hasName = edge("hasName")
 const hasMailbox = edge("hasMailbox")
 
-const as = <N extends string>() => true
 
-where(
-    ["subject", isTypeOf, person],
-    ["subject", hasName, "name"],
-    ["subject", hasMailbox, "name"]
-).select({
-    name: toString,
-    email: toString
-}) // ?
-
-
+select(({
+    name,
+    email
+}) => where(
+    [name, isTypeOf, person],
+    [person, hasName, name],
+    [person, hasMailbox, email]
+)
 
 /*
 PREFIX foaf: <http://xmlns.com/foaf/0.1/>
