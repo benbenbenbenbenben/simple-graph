@@ -1,10 +1,5 @@
-import { whereClauseToSql } from "@src/index"
+import { Extendable, Props, VertexModel, whereClauseToSql } from "@src/index"
 
-type PropType = number | string | boolean | { [x: string]: PropType }
-type Props = {
-    [x: string]: PropType | PropType[]
-}
-type Extendable<Obj> = Record<string, unknown> & Obj
 
 type KnownSources = {
 
@@ -14,18 +9,6 @@ type KnownTargets = {
 
 }
 
-type EdgeModel<
-    Name extends string = string,
-    Namespace extends string = string,
-    InverseName extends string = `inverse(${Name})`,
-    KnownProps extends Props | undefined = any,
-    > = {
-        $type: "edge"
-        $name: Name
-        $inverseName: InverseName
-        $ns: Namespace
-        $props: Extendable<KnownProps extends undefined ? (Props | undefined) : KnownProps>
-    }
 
 type EdgeDescriptor<
     N extends string = string,
@@ -34,28 +17,17 @@ type EdgeDescriptor<
     P extends Extendable<Props> = any,
     SD extends VertexDescriptor = any,
     TD extends VertexDescriptor = any> = {
+        $type: "edge"
         $id: string
-        $type: "edge",
-        $name: N,
-        $inverseName: IN,
-        $ns: NS,
-        $props: P,
+        $name: N
+        $inverseName: IN
+        $ns: NS
         $source: SD
         $target: TD
+        $props: P
     }
 
 
-type VertexModel<
-    Name extends string = string,
-    Namespace extends string = string,
-    KnownProps extends Props | undefined = any,
-    > = {
-        $id: string
-        $type: "vertex"
-        $name: Name
-        $ns: Namespace
-        $props: Extendable<KnownProps extends undefined ? (Props | undefined) : KnownProps>
-    }
 
 
 
@@ -63,11 +35,11 @@ type VertexDescriptor<
     N extends string = string,
     NS extends string = string,
     P extends Extendable<Props> = any> = {
+        $type: "vertex"
         $id: string
-        $type: "vertex",
-        $name: N,
-        $ns: NS,
-        $props: P,
+        $name: N
+        $ns: NS
+        $props: P
     }
 
 const vertex = <N extends string = "", NS extends string = "">(

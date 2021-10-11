@@ -26,7 +26,8 @@
   "dependencies": {
     "husky": "^7.0.2",
     "luxon": "^2.0.2",
-    "sql.js": "^1.6.1"
+    "sql.js": "^1.6.1",
+    "tibu": "^0.0.1-alpha3"
   },
   "husky": {
     "hooks": {

@@ -2994,6 +2994,11 @@ throat@^6.0.1:
   resolved "https://registry.yarnpkg.com/throat/-/throat-6.0.1.tgz#d514fedad95740c12c2d7fc70ea863eb51ade375"
   integrity sha512-8hmiGIJMDlwjg7dlJ4yKGLK8EsYqKgPWbG3b4wjJddKNwc7N7Dpn08Df4szr/sZdMVeOstrdYSsqzX6BYbcB+w==
 
+tibu@^0.0.1-alpha3:
+  version "0.0.1-alpha3"
+  resolved "https://registry.yarnpkg.com/tibu/-/tibu-0.0.1-alpha3.tgz#e3de63f59b282df2f93bd8cc2f64b04af849a664"
+  integrity sha512-R6BpjSKfpGjMsLVwRjSGHAeSCL5P7v7qICTmtGzVTZ5Oj4Z+LcxIGdwbbBRTSipMGj66cUAhQjvsKGxCkDdVQw==
+
 tmpl@1.0.x:
   version "1.0.5"
   resolved "https://registry.yarnpkg.com/tmpl/-/tmpl-1.0.5.tgz#8683e0b902bb9c20c4f726e3c0b69f36518c07cc"

@@ -31,36 +31,36 @@ describe("sql", () => {
     })
 
     test("insert-node & search-node-by-id & delete-node", async () => {
-        await db.insertNode({ id: "1" });
+        await db.insertVertex({ id: "1" });
 
-        const result = db.getNodeById("1");
-        expect(result).toEqual({ id: "1" });
+        const result = db.getVertexById("1");
+        expect(result).toEqual({ id: "1", name: null, ns: null, props: null, type: "vertex" });
 
-        db.deleteNode("1");
-        const deleted = db.getNodeById("1");
+        db.deleteVertex("1");
+        const deleted = db.getVertexById("1");
         expect(deleted).toBeUndefined();
     })
 
     test("insert-edge & search-edges & search-edge-by-id & delete-edge", async () => {
-        db.insertNode({ id: "1" });
-        db.insertNode({ id: "2" });
-        db.insertEdge({ source: "1", target: "2", id: "12abc", fact: "abc" });
-        const result1 = db.getNodeById("1");
-        expect(result1).toEqual({ id: "1" })
-        const result2 = db.getNodeById("2");
-        expect(result2).toEqual({ id: "2" })
+        db.insertVertex({ id: "1" });
+        db.insertVertex({ id: "2" });
+        db.insertEdge({ source: "1", target: "2", id: "12abc", props: { fact: "abc" } });
+        const result1 = db.getVertexById("1");
+        expect(result1).toEqual({ id: "1", name: null, ns: null, props: null, type: "vertex" })
+        const result2 = db.getVertexById("2");
+        expect(result2).toEqual({ id: "2", name: null, ns: null, props: null, type: "vertex" })
 
         // from-to
         const edgeFT = db.getEdges("1", "2");
-        expect([...edgeFT]).toEqual([{ source: "1", target: "2", id: "12abc", fact: "abc" }]);
+        expect([...edgeFT]).toEqual([{ source: "1", target: "2", id: "12abc", name: null, inverseName: null, ns: null, props: { fact: "abc" }, type: "edge" }]);
 
         // to-from
         const edgeTF = db.getEdges("2", "1", "toFrom");
-        expect([...edgeTF]).toEqual([{ source: "1", target: "2", id: "12abc", fact: "abc" }]);
+        expect([...edgeTF]).toEqual([{ source: "1", target: "2", id: "12abc", name: null, inverseName: null, ns: null, props: { fact: "abc" }, type: "edge" }]);
 
         // both
         const edgeXX = db.getEdges("2", "1", "both");
-        expect([...edgeXX]).toEqual([{ source: "1", target: "2", id: "12abc", fact: "abc" }]);
+        expect([...edgeXX]).toEqual([{ source: "1", target: "2", id: "12abc", name: null, inverseName: null, ns: null, props: { fact: "abc" }, type: "edge" }]);
 
         const edge = db.getEdgeById("12abc")!
         db.deleteEdge(edge.id);
@@ -68,44 +68,42 @@ describe("sql", () => {
         expect(noEdge).toBeUndefined();
     })
 
-    test("searchNodes", () => {
-        type nodeType = {
-            id: string
-            field: string
-        }
-        db.insertNode<nodeType>({ id: "a", field: "value" })
-        const nodes = [...db.searchVertices<nodeType>({ field: { eq: "value" } })]
-        expect(nodes).toStrictEqual([{ id: "a", field: "value" }])
+    test("searchVertices", () => {
+        db.insertVertex({ id: "a", props: { field: "value" } })
+        const nodes = [...db.searchVertices({ field: { eq: "value" } })]
+        expect(nodes).toStrictEqual([{ id: "a", name: null, ns: null, props: { field: "value" }, type: "vertex" }])
     })
 
     test("searchEdges", () => {
-        type nodeType = {
-            id: string
-            field: string
-        }
-        db.insertNode<nodeType>({ id: "a", field: "value" })
-        db.insertNode<nodeType>({ id: "b", field: "value" })
-        db.insertEdge({ source: "a", target: "b", meta: "data" })
-        const edges = [...db.searchEdges<{ meta: string }>({ meta: { eq: "data" } })]
+        db.insertVertex({ id: "a", props: { field: "value" } })
+        db.insertVertex({ id: "b", props: { field: "value" } })
+        db.insertEdge({ source: "a", target: "b", props: { meta: "data" } })
+        const edges = [...db.searchEdges({ meta: { eq: "data" } })]
         expect(edges).toStrictEqual([{
             id: "a:b",
+            name: null,
+            inverseName: null,
+            ns: null,
             source: "a",
             target: "b",
-            meta: "data"
+            props: {
+                meta: "data"
+            },
+            type: "edge"
         }])
     })
 
     test("insert-node & update-node", async () => {
-        db.insertNode({
+        db.insertVertex({
             id: "a",
-            tag: "0"
+            props: { a: 0 }
         })
-        expect(db.getNodeById("a")).toEqual({ id: "a", tag: "0" })
-        db.updateNode({
+        expect(db.getVertexById("a")).toEqual({ id: "a", name: null, ns: null, type: "vertex", props: { a: 0 } })
+        db.updateVertex({
             id: "a",
-            tag: "1"
+            props: { b: 1 }
         })
-        expect(db.getNodeById("a")).toEqual({ id: "a", tag: "1" })
+        expect(db.getVertexById("a")).toEqual({ id: "a", name: null, ns: null, type: "vertex", props: { b: 1 } })
     })
 
     test("whereClauseToSql", () => {
@@ -157,70 +155,70 @@ describe("sql", () => {
     })
 
     test("traverse", () => {
-        db.insertNode({ id: "a" })
-        db.insertNode({ id: "b" })
-        db.insertNode({ id: "c" })
-        db.insertNode({ id: "d" })
-        db.insertNode({ id: "e" })
+        db.insertVertex({ id: "a" })
+        db.insertVertex({ id: "b" })
+        db.insertVertex({ id: "c" })
+        db.insertVertex({ id: "d" })
+        db.insertVertex({ id: "e" })
         db.insertEdge({ source: "a", target: "b" })
         db.insertEdge({ source: "b", target: "c" })
         db.insertEdge({ source: "c", target: "d" })
         db.insertEdge({ source: "d", target: "e" })
 
         expect([...db.traverse("a")]).toStrictEqual([
-            { id: "a", kind: "node" },
+            { id: "a", kind: "vertex" },
             { id: "a:b", kind: "targets" },
-            { id: "b", kind: "node" },
+            { id: "b", kind: "vertex" },
             { id: "a:b", kind: "sources" },
             { id: "b:c", kind: "targets" },
-            { id: "c", kind: "node" },
+            { id: "c", kind: "vertex" },
             { id: "b:c", kind: "sources" },
             { id: "c:d", kind: "targets" },
-            { id: "d", kind: "node" },
+            { id: "d", kind: "vertex" },
             { id: "c:d", kind: "sources" },
             { id: "d:e", kind: "targets" },
-            { id: "e", kind: "node" },
+            { id: "e", kind: "vertex" },
             { id: "d:e", kind: "sources" },
         ])
     })
 
-    test("traverseWithBody", () => {
-        db.insertNode({ id: "a" })
-        db.insertNode({ id: "b" })
-        db.insertNode({ id: "c" })
-        db.insertNode({ id: "d" })
-        db.insertNode({ id: "e" })
-        db.insertEdge({ source: "a", target: "b" })
-        db.insertEdge({ source: "b", target: "c" })
-        db.insertEdge({ source: "c", target: "d" })
-        db.insertEdge({ source: "d", target: "e" })
+    test("traverseWithProps", () => {
+        db.insertVertex({ id: "a", props: { thisId: "a" } })
+        db.insertVertex({ id: "b", props: { thisId: "b" } })
+        db.insertVertex({ id: "c", props: { thisId: "c" } })
+        db.insertVertex({ id: "d", props: { thisId: "d" } })
+        db.insertVertex({ id: "e", props: { thisId: "e" } })
+        db.insertEdge({ source: "a", target: "b", props: { thisEdgeSource: "a" } })
+        db.insertEdge({ source: "b", target: "c", props: { thisEdgeSource: "b" } })
+        db.insertEdge({ source: "c", target: "d", props: { thisEdgeSource: "c" } })
+        db.insertEdge({ source: "d", target: "e", props: { thisEdgeSource: "d" } })
 
-        expect([...db.traverseWithBody("a")]).toStrictEqual([
-            { id: "a", kind: "node", node: { id: "a" } },
-            { id: "a:b", kind: "targets", targets: { id: "a:b", source: "a", target: "b" } },
-            { id: "b", kind: "node", node: { id: "b" } },
-            { id: "a:b", kind: "sources", sources: { id: "a:b", source: "a", target: "b" } },
-            { id: "b:c", kind: "targets", targets: { id: "b:c", source: "b", target: "c" } },
-            { id: "c", kind: "node", node: { id: "c" } },
-            { id: "b:c", kind: "sources", sources: { id: "b:c", source: "b", target: "c" } },
-            { id: "c:d", kind: "targets", targets: { id: "c:d", source: "c", target: "d" } },
-            { id: "d", kind: "node", node: { id: "d" } },
-            { id: "c:d", kind: "sources", sources: { id: "c:d", source: "c", target: "d" } },
-            { id: "d:e", kind: "targets", targets: { id: "d:e", source: "d", target: "e" } },
-            { id: "e", kind: "node", node: { id: "e" } },
-            { id: "d:e", kind: "sources", sources: { id: "d:e", source: "d", target: "e" } },
+        expect([...db.traverseWithProps("a")]).toStrictEqual([
+            { id: "a", kind: "vertex", props: { thisId: "a" } },
+            { id: "a:b", kind: "targets", source: "a", target: "b", props: { thisEdgeSource: "a" } },
+            { id: "b", kind: "vertex", props: { thisId: "b" } },
+            { id: "a:b", kind: "sources", source: "a", target: "b", props: { thisEdgeSource: "a" } },
+            { id: "b:c", kind: "targets", source: "b", target: "c", props: { thisEdgeSource: "b" } },
+            { id: "c", kind: "vertex", props: { thisId: "c" } },
+            { id: "b:c", kind: "sources", source: "b", target: "c", props: { thisEdgeSource: "b" } },
+            { id: "c:d", kind: "targets", source: "c", target: "d", props: { thisEdgeSource: "c" } },
+            { id: "d", kind: "vertex", props: { thisId: "d" } },
+            { id: "c:d", kind: "sources", source: "c", target: "d", props: { thisEdgeSource: "c" } },
+            { id: "d:e", kind: "targets", source: "d", target: "e", props: { thisEdgeSource: "d" } },
+            { id: "e", kind: "vertex", props: { thisId: "e" } },
+            { id: "d:e", kind: "sources", source: "d", target: "e", props: { thisEdgeSource: "d" } },
         ])
 
-        expect([...db.traverseWithBody("a", "targets")]).toStrictEqual([
-            { id: "a", kind: "node", node: { id: "a" } },
-            { id: "a:b", kind: "targets", targets: { id: "a:b", source: "a", target: "b" } },
-            { id: "b", kind: "node", node: { id: "b" } },
-            { id: "b:c", kind: "targets", targets: { id: "b:c", source: "b", target: "c" } },
-            { id: "c", kind: "node", node: { id: "c" } },
-            { id: "c:d", kind: "targets", targets: { id: "c:d", source: "c", target: "d" } },
-            { id: "d", kind: "node", node: { id: "d" } },
-            { id: "d:e", kind: "targets", targets: { id: "d:e", source: "d", target: "e" } },
-            { id: "e", kind: "node", node: { id: "e" } },
+        expect([...db.traverseWithProps("a", "targets")]).toStrictEqual([
+            { id: "a", kind: "vertex", props: { thisId: "a" } },
+            { id: "a:b", kind: "targets", source: "a", target: "b", props: { thisEdgeSource: "a" } },
+            { id: "b", kind: "vertex", props: { thisId: "b" } },
+            { id: "b:c", kind: "targets", source: "b", target: "c", props: { thisEdgeSource: "b" } },
+            { id: "c", kind: "vertex", props: { thisId: "c" } },
+            { id: "c:d", kind: "targets", source: "c", target: "d", props: { thisEdgeSource: "c" } },
+            { id: "d", kind: "vertex", props: { thisId: "d" } },
+            { id: "d:e", kind: "targets", source: "d", target: "e", props: { thisEdgeSource: "d" } },
+            { id: "e", kind: "vertex", props: { thisId: "e" } },
         ])
     })
 

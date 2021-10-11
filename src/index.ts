@@ -5,64 +5,150 @@ export const linetrim = (strings: TemplateStringsArray, ...expr: string[]): stri
     return strings.slice(1).reduce((str, fragment, i) => str + expr[i] + fragment, strings[0]).replace(/^.*$/gm, line => line.trim() + `\n`)
 }
 
+export const ltrbtrim = (strings: TemplateStringsArray, ...expr: string[]): string => {
+    return strings.slice(1).reduce((str, fragment, i) => str + expr[i] + fragment, strings[0]).replace(/^.*$/gm, line => line.trim() + `\n`).replace(/^(\r|\n|\r\n)/g, "")
+}
+
 const DefaultSchema = linetrim`
     CREATE TABLE IF NOT EXISTS vertices (
-        body TEXT,
-        id   TEXT GENERATED ALWAYS AS (json_extract(body, '$.id')) VIRTUAL NOT NULL UNIQUE
+        id      TEXT NOT NULL UNIQUE,
+        name    TEXT,
+        ns      TEXT,
+        props   TEXT
     );
 
     CREATE INDEX IF NOT EXISTS id_idx ON vertices(id);
+    CREATE INDEX IF NOT EXISTS id_idx ON vertices(name);
+    CREATE INDEX IF NOT EXISTS id_idx ON vertices(ns);
 
     CREATE TABLE IF NOT EXISTS edges (
-        properties TEXT,
-        source     TEXT GENERATED ALWAYS AS (json_extract(properties, '$.source')) VIRTUAL NOT NULL,
-        target     TEXT GENERATED ALWAYS AS (json_extract(properties, '$.target')) VIRTUAL NOT NULL,
-        id         TEXT GENERATED ALWAYS AS (coalesce(json_extract(properties, '$.id'), source || ':' || target)) VIRTUAL NOT NULL UNIQUE,
+        id          TEXT NOT NULL UNIQUE,
+        name        TEXT,
+        inverseName TEXT,
+        ns          TEXT,
+        source      TEXT,
+        target      TEXT,
+        props       TEXT,
         FOREIGN KEY(source) REFERENCES vertices(id),
         FOREIGN KEY(target) REFERENCES vertices(id)
     );
 
     CREATE INDEX IF NOT EXISTS id_idx ON edges(id);
+    CREATE INDEX IF NOT EXISTS name_idx ON edges(name);
+    CREATE INDEX IF NOT EXISTS inverseName_idx ON edges(inverseName);
+    CREATE INDEX IF NOT EXISTS ns_idx ON edges(ns);
     CREATE INDEX IF NOT EXISTS source_idx ON edges(source);
     CREATE INDEX IF NOT EXISTS target_idx ON edges(target);
 `
+export type Extendable<Obj> = Record<string, unknown> & Obj
+
+export type PropType = number | string | boolean | { [x: string]: PropType }
+export type Props = {
+    [x: string]: PropType | PropType[]
+}
+
+export type VertexModel<
+    Name extends string = string,
+    Namespace extends string = string,
+    KnownProps extends Props | undefined = any,
+    > = {
+        type: "vertex"
+        id: string
+        name: Name
+        ns: Namespace
+        props: Extendable<KnownProps extends undefined ? (Props | undefined) : KnownProps>
+    }
+export type EdgeModel<
+    Name extends string = string,
+    Namespace extends string = string,
+    InverseName extends string = `inverse(${Name})`,
+    KnownProps extends Props | undefined = any,
+    > = {
+        type: "edge"
+        id: string
+        source: string
+        target: string
+        name: Name
+        inverseName: InverseName
+        ns: Namespace
+        props: Extendable<KnownProps extends undefined ? (Props | undefined) : KnownProps>
+    }
+
+export type RequiredOmitted<T, R extends keyof T, O extends PropertyKey> =
+    Partial<Omit<T, O>> & Pick<T, R>
 
 export const createDb = async (schema = DefaultSchema) => {
     const database = new (await sqlite).Database();
     database.exec(schema);
     return {
-        insertNode: <T extends { id: string }>(node: T) => {
-            database.run(`INSERT INTO vertices VALUES(json(?))`, [JSON.stringify(node)]);
+        insertVertex: <T extends RequiredOmitted<VertexModel, "id", "type">>(node: T) => {
+            database.run(`INSERT INTO vertices VALUES(?, ?, ?, json(?))`, [
+                node.id,
+                node.name ?? null,
+                node.ns ?? null,
+                node.props ? JSON.stringify(node.props) : null
+            ]);
         },
-        updateNode: <T extends { id: string }>(node: T) => {
-            database.run(`UPDATE vertices SET body = json(?) WHERE id = ?`, [JSON.stringify(node), node.id])
+        updateVertex: <T extends RequiredOmitted<VertexModel, "id", "type">>(node: T) => {
+            database.run(ltrbtrim`
+                UPDATE vertices
+                SET name = ?,
+                    ns = ?,
+                    props = json(?)
+                WHERE id = ?
+            `, [
+                node.name ?? null,
+                node.ns ?? null,
+                node.props ? JSON.stringify(node.props) : null,
+                node.id
+            ])
         },
-        deleteNode: (id: string) => {
+        deleteVertex: (id: string) => {
             database.run(`DELETE FROM vertices WHERE id = ?`, [id]);
         },
-        getNodeById: <T extends { id: string }>(id: string) => {
-            const stmt = database.prepare(`SELECT body FROM vertices WHERE id = ?`, [id]);
+        getVertexById: <T extends VertexModel>(id: string): T | undefined => {
+            const stmt = database.prepare(`SELECT * FROM vertices WHERE id = ?`, [id]);
             if (stmt.step()) {
-                return JSON.parse(stmt.getAsObject().body!.toString()) as T;
+                return {
+                    ...stmt.getAsObject(),
+                    props: JSON.parse((stmt.getAsObject().props || "null").toString()),
+                    type: "vertex"
+                } as T;
             } else {
                 return undefined;
             }
         },
-        insertEdge: <T extends { source: string, target: string, id?: string }>(edge: T) => {
-            database.run(`INSERT INTO edges VALUES(json(?))`, [JSON.stringify({ id: `${edge.source}:${edge.target}`, ...edge })]);
+        insertEdge: <T extends RequiredOmitted<EdgeModel, "source" | "target", "type">>(edge: T) => {
+            database.run(ltrbtrim`
+                INSERT INTO edges VALUES(
+                    ?, ?, ?, ?, ?, ?, json(?)
+                )
+            `, [
+                edge.id ?? `${edge.source}:${edge.target}`,
+                edge.name ?? null,
+                edge.inverseName ?? (edge.name ? `inverse(${edge.name})` : null),
+                edge.ns ?? null,
+                edge.source,
+                edge.target,
+                edge.props ? JSON.stringify(edge.props) : null,
+            ]);
         },
         deleteEdge: (id: string) => {
             database.run(`DELETE FROM edges WHERE id = ?`, [id])
         },
-        getEdgeById: <T extends { id: string, source: string, target: string }>(id: string): T | undefined => {
-            const stmt = database.prepare(`SELECT * FROM edges wHERE id = ?`, [id]);
+        getEdgeById: <T extends EdgeModel>(id: string): T | undefined => {
+            const stmt = database.prepare(`SELECT * FROM edges WHERE id = ?`, [id]);
             if (stmt.step()) {
-                return JSON.parse(stmt.getAsObject().properties!.toString()) as T;
+                return {
+                    ...stmt.getAsObject(),
+                    props: JSON.parse((stmt.getAsObject().props || "null").toString()),
+                    type: "edge"
+                } as T;
             } else {
                 return undefined;
             }
         },
-        getEdges: function* <T extends { id: string, source: string, target: string }>(fromId: string, toId: string, direction: "fromTo" | "toFrom" | "both" = "fromTo"): IterableIterator<T> {
+        getEdges: function* <T extends EdgeModel>(fromId: string, toId: string, direction: "fromTo" | "toFrom" | "both" = "fromTo"): IterableIterator<T> {
             if (direction === "both") {
                 yield* this.getEdges(toId, fromId);
                 direction = "fromTo";
@@ -73,35 +159,46 @@ export const createDb = async (schema = DefaultSchema) => {
                 SELECT * FROM edges WHERE target = ?
             `, direction === "fromTo" ? [fromId, toId] : [toId, fromId]);
             while (stmt.step()) {
-                const edge = stmt.getAsObject() as any as { id: string, source: string, target: string, properties: string };
-                yield JSON.parse(edge.properties) as T;
+                yield {
+                    ...stmt.getAsObject(),
+                    props: JSON.parse((stmt.getAsObject().props || "null").toString()),
+                    type: "edge"
+                } as T;
             }
         },
-        searchVertices: function* <T>(query: WhereClause<Partial<T>>, finalClause?: { OFFSET: number, LIMIT: number }) {
-            const where = whereClauseToSql(query, "body");
+        searchVertices: function* <T extends VertexModel>(query: WhereClause<Partial<T["props"]>>, finalClause?: { OFFSET: number, LIMIT: number }) {
+            const where = whereClauseToSql(query, "props");
             // TODO: this would be better as object params as opposed to array
             const finalClauseSql = finalClause ? `LIMIT ${finalClause.LIMIT + 0} OFFSET ${finalClause.OFFSET + 0}` : ``;
             const stmt = database.prepare(`SELECT * FROM vertices WHERE ${where.sql} ${finalClauseSql}`, where.params)
             while (stmt.step()) {
-                yield JSON.parse(stmt.getAsObject().body!.toString()) as T;
+                yield {
+                    ...stmt.getAsObject(),
+                    props: JSON.parse((stmt.getAsObject().props || "null").toString()),
+                    type: "vertex"
+                } as T;
             }
         },
-        searchEdges: function* <T>(query: WhereClause<Partial<T>>) {
-            const where = whereClauseToSql(query, "properties");
+        searchEdges: function* <T extends EdgeModel>(query: WhereClause<Partial<T["props"]>>) {
+            const where = whereClauseToSql(query, "props");
             const stmt = database.prepare(`SELECT * FROM edges WHERE ${where.sql}`, where.params)
             while (stmt.step()) {
-                yield JSON.parse(stmt.getAsObject().properties!.toString()) as T;
+                yield {
+                    ...stmt.getAsObject(),
+                    props: JSON.parse((stmt.getAsObject().props || "null").toString()),
+                    type: "edge"
+                } as T;
             }
         },
-        traverse: function* (nodeId: string, direction: "both" | "sources" | "targets" = "both"): IterableIterator<{
+        traverse: function* (vertexId: string, direction: "both" | "sources" | "targets" = "both"): IterableIterator<{
             id: string,
-            kind: "node" | "sources" | "targets"
+            kind: "vertex" | "sources" | "targets"
         }> {
             const sql = `
                 WITH RECURSIVE traverse(x, z, y) AS (
                 SELECT :0, '', '()'
                 UNION
-                SELECT id, null, 'node' FROM vertices JOIN traverse ON id = x
+                SELECT id, null, 'vertex' FROM vertices JOIN traverse ON id = x
                 ${direction !== "targets" ? `
                     UNION
                     SELECT source, id as eid, 'sources' FROM edges JOIN traverse ON target = x
@@ -112,41 +209,46 @@ export const createDb = async (schema = DefaultSchema) => {
                 ` : ``}
               ) SELECT coalesce(z, x) as id, y as kind FROM traverse LIMIT -1 OFFSET 1;
             `
-            const stmt = database.prepare(sql, [nodeId]);
+            const stmt = database.prepare(sql, [vertexId]);
             while (stmt.step()) {
                 yield stmt.getAsObject() as {
                     id: string,
-                    kind: "node" | "sources" | "targets"
+                    kind: "vertex" | "sources" | "targets"
                 }
             }
         },
-        traverseWithBody: function* <NodeTypes = unknown, SourceTypes = unknown, TargetTypes = unknown>(nodeId: string, direction: "both" | "sources" | "targets" = "both"): IterableIterator<
+        traverseWithProps: function* <NodeTypes = unknown, SourceTypes = unknown, TargetTypes = unknown>(vertexId: string, direction: "both" | "sources" | "targets" = "both"): IterableIterator<
             { id: string } & (
-                { kind: "node", node: NodeTypes } | { kind: "sources", sources: SourceTypes } | { kind: "targets", targets: TargetTypes }
+                { kind: "vertex", vertex: NodeTypes } | { kind: "sources", sources: SourceTypes } | { kind: "targets", targets: TargetTypes }
             )
         > {
             const sql = `
-                WITH RECURSIVE traverse(x, z, y, obj) AS (
-                SELECT :0, '', '()', '{}'
+                WITH RECURSIVE traverse(x, z, y, s, t, obj) AS (
+                SELECT :0, '', '()', 's', 't', '{}'
                 UNION
-                SELECT id, null, 'node', body FROM vertices JOIN traverse ON id = x
+                SELECT id, null, 'vertex', null, null, props FROM vertices JOIN traverse ON id = x
                 ${direction !== "targets" ? `
                     UNION
-                    SELECT source, id as eid, 'sources', properties FROM edges JOIN traverse ON target = x
+                    SELECT source, id as eid, 'sources', source, target, props FROM edges JOIN traverse ON target = x
                 ` : ``}
                 ${direction !== "sources" ? `
                     UNION
-                    SELECT target, id as eid, 'targets', properties FROM edges JOIN traverse ON source = x
+                    SELECT target, id as eid, 'targets', source, target, props FROM edges JOIN traverse ON source = x
                 ` : ``}
-              ) SELECT coalesce(z, x) as id, y as kind, obj FROM traverse LIMIT -1 OFFSET 1;
+              ) SELECT coalesce(z, x) as id, y as kind, s, t, obj FROM traverse LIMIT -1 OFFSET 1;
             `
-            const stmt = database.prepare(sql, [nodeId]);
+            const stmt = database.prepare(sql, [vertexId]);
             while (stmt.step()) {
-                const result = stmt.getAsObject() as { kind: "node" | "sources" | "targets", id: string, obj: string }
+                stmt.getAsObject() // ?
+                const result = stmt.getAsObject() as { kind: "vertex" | "sources" | "targets", id: string, obj: string, s: string, t: string }
                 yield {
                     id: result.id,
                     kind: result.kind,
-                    [result.kind]: JSON.parse(result.obj),
+                    ...(result.kind !== "vertex" ? {
+                        source: result.s,
+                        target: result.t,
+                    } : {}),
+                    props: JSON.parse(result.obj),
                 } as unknown as any
             }
         },
