@@ -209,14 +209,17 @@ const createCallableType = <F extends (...args: any[]) => any, I extends any>(f:
 }
 type Described = { describe: VertexDescriptor | EdgeDescriptor }
 type TripleWhere = [
-    Described, string | Described, string | Described
+    Described, DescriptorProxy | Described, DescriptorProxy | Described
 ] | [
-    string | Described, Described, string | Described
+    DescriptorProxy | Described, Described, DescriptorProxy | Described
 ] | [
-    string | Described, string | Described, Described
+    DescriptorProxy | Described, DescriptorProxy | Described, Described
 ] | [
     Described, Described, Described /* traversal */
 ]
+type DescriptorProxy = {
+    index: number
+}
 
 const one = createCallableType(() => 1, { x: 1 })
 one.x //?
@@ -226,15 +229,33 @@ const isTypeOf = edge("isTypeOf")
 const hasName = edge("hasName")
 const hasMailbox = edge("hasMailbox")
 
+const tripleQuery = (
+    build: (utils: { val: () => DescriptorProxy, where: (...triple: TripleWhere[]) => { select: (row: (DescriptorProxy | Described)[]) => any } }) => any
+) => {
+    const values: DescriptorProxy[] = []
+    const val = () => values[values.push({ index: values.length }) - 1]
+    const where = (...triple: TripleWhere[]) => {
+        return {
+            select: (row: (DescriptorProxy | Described)[]) => {
+                // TODO: transform this from SPARQL-like into SQL
+                return JSON.stringify(row)
+            }
+        }
+    }
+    return build({ val, where })
+};
 
-select(({
-    name,
-    email
-}) => where(
-    [name, isTypeOf, person],
-    [person, hasName, name],
-    [person, hasMailbox, email]
-)
+tripleQuery(({ val, where }) => {
+    const name = val()
+    const email = val()
+    return where(
+        [name, isTypeOf, person],
+        [person, hasName, name],
+        [person, hasMailbox, email]
+    ).select([name, email])
+}) // ?
+
+
 
 /*
 PREFIX foaf: <http://xmlns.com/foaf/0.1/>
