@@ -142,7 +142,7 @@ type InsertableEdgeToVertices = [
             InsertableEdgeToVertices
         ]
     )
-] | InsertableEdgeToVertices[]
+]
 
 
 type CallableType<F extends (...args: any[]) => any, I extends any> = F & I
@@ -179,7 +179,10 @@ const convertToVertex = (model: InsertableVertex): VertexModel => {
     }
 }
 
-const convertToEdge = (model: InsertableEdge): EdgeModel => {
+const convertToEdge = (model: InsertableEdge | { describe: EdgeDescriptor }): EdgeModel => {
+    if (typeof model === "object" && "describe" in model) {
+        return model.describe
+    }
     if (typeof model === "string") {
         return {
             type: "edge",
@@ -200,16 +203,39 @@ export const tripleStore = async (db: ReturnType<typeof createDb>) => {
             single: InsertableVertex, doubles?: InsertableEdgeToVertices | InsertableEdgeToVertices[],
             ...triple: [restsingle: InsertableVertex, ...restdouble: InsertableEdgeToVertices[]][]
         ): Promise<any> => {
+            const isInsertableEdgeToVertices = (doubles: InsertableEdgeToVertices | InsertableEdgeToVertices[]) => {
+                const [edgeCandidate, vertexOrVerticesOrInsertableEdgeToVertices] = doubles
+                
+            }
             if (doubles) {
-                const subject = convertToVertex(single)
+                const getVertexAndEdgesForInsert = (single: InsertableVertex, ...doubles: InsertableEdgeToVertices[]) => {
+                    const more: (VertexModel | EdgeModel)[] = []
+                    const subject = convertToVertex(single)
+                    more.push(subject)
+                    doubles.forEach(double => {
+                        const [edge, target] = double
+                        const predicate = convertToEdge(edge)
+                        const objectsAndDoubles = Array.isArray(target) ? target : [target]
+                        const objects = objectsAndDoubles.filter(oad => typeof oad === "string" ? true : "type" in oad ? true : false).map(o => convertToVertex(o as InsertableVertex))
+                        const predicates = objects.map(o => ({
+                            ...predicate,
+                            source: predicate.source || subject.id,
+                            target: predicate.target || o.id
+                        }))
+                        more.push(...predicates)
+                        // TODO: is doubles[1] either:
+                        // 1. a single vertex
+                        // 2. an array of vertice
+                        // 3. a tuple of a vertex and an insertable edge to vertex
+                    })
+                    return more
+                }
                 // is this a tuple[] or a tuple?
                 if (Array.isArray(doubles[0])) {
 
+                    return db.then(db => db.insertMany())
                 } else {
-                    const [predicate, object] = [convertToEdge(doubles[0] as InsertableEdge), convertToVertex(doubles[1] as InsertableVertex)]
-                    predicate.source = predicate.source ?? subject.id
-                    predicate.target = predicate.target ?? object.id
-                    return db.then(db => db.insertMany(subject, predicate, object))
+                    return db.then(db => db.insertMany(...getVertexAndEdgesForInsert(single, ...(isInsertableEdgeToVertices(doubles) ? [doubles] : doubles))))
                 }
             } else {
                 const vertex = convertToVertex(single)
