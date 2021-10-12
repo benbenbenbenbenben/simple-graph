@@ -1,8 +1,8 @@
-import init, { ParamsObject, SqlValue } from "sql.js";
+import init, { BindParams, ParamsObject, SqlValue } from "sql.js";
 const sqlite = init();
 
 export const linetrim = (strings: TemplateStringsArray, ...expr: string[]): string => {
-    return strings.slice(1).reduce((str, fragment, i) => str + expr[i] + fragment, strings[0]).replace(/^.*$/gm, line => line.trim() + `\n`)
+    return strings.slice(1).reduce((str, fragment, i) => str + expr[i] + fragment, strings[0]).replace(/^.*(\r\n|\r|\n)$/gm, line => line.trim() + `\n`)
 }
 
 export const ltrbtrim = (strings: TemplateStringsArray, ...expr: string[]): string => {
@@ -54,9 +54,9 @@ export type VertexModel<
     > = {
         type: "vertex"
         id: string
-        name: Name
-        ns: Namespace
-        props: Extendable<KnownProps extends undefined ? (Props | undefined) : KnownProps>
+        name?: Name
+        ns?: Namespace
+        props?: Extendable<KnownProps extends undefined ? (Props | undefined) : KnownProps>
     }
 export type EdgeModel<
     Name extends string = string,
@@ -65,13 +65,13 @@ export type EdgeModel<
     KnownProps extends Props | undefined = any,
     > = {
         type: "edge"
-        id: string
+        id?: string
         source: string
         target: string
-        name: Name
-        inverseName: InverseName
-        ns: Namespace
-        props: Extendable<KnownProps extends undefined ? (Props | undefined) : KnownProps>
+        name?: Name
+        inverseName?: InverseName
+        ns?: Namespace
+        props?: Extendable<KnownProps extends undefined ? (Props | undefined) : KnownProps>
     }
 
 export type RequiredOmitted<T, R extends keyof T, O extends PropertyKey> =
@@ -79,8 +79,41 @@ export type RequiredOmitted<T, R extends keyof T, O extends PropertyKey> =
 
 export const createDb = async (schema = DefaultSchema) => {
     const database = new (await sqlite).Database();
-    database.exec(schema);
+    database.run(schema);
     return {
+        insertMany: (...vertexOrEdge: (RequiredOmitted<VertexModel, "id" | "type", never> | RequiredOmitted<EdgeModel, "source" | "target" | "type", never>)[]) => {
+            const vertices = vertexOrEdge.filter(t => t.type === "vertex") as VertexModel[]
+            const edges = vertexOrEdge.filter(t => t.type === "edge") as EdgeModel[]
+
+            const verticesInsertStatement = vertices.length === 0 ? ''
+                : linetrim`${vertices.map((v, i) => `INSERT INTO vertices VALUES(:p${i * 4}, :p${i * 4 + 1}, :p${i * 4 + 2}, json(:p${i * 4 + 3}))`).join(";\n")};`
+            const edgesInsertStatement = edges.length === 0 ? ''
+                : linetrim`${edges.map((e, i) => `INSERT INTO edges VALUES(:p${(vertices.length * 4) + i * 7}, :p${(vertices.length * 4) + i * 7 + 1}, :p${(vertices.length * 4) + i * 7 + 2}, :p${(vertices.length * 4) + i * 7 + 3}, :p${(vertices.length * 4) + i * 7 + 4}, :p${(vertices.length * 4) + i * 7 + 5}, json(:p${(vertices.length * 4) + i * 7 + 6}))`).join(", ")}
+            `;
+            linetrim`${verticesInsertStatement}
+            ${edgesInsertStatement}` // ?
+            // const values = [...vertices.flatMap(v => (
+            //     [v.id, v.name || null, v.ns || null, v.props ? JSON.stringify(v.props) : null]
+            // )), ...edges.flatMap(e => (
+            //     [e.id || null, e.name || null, e.inverseName || null, e.ns || null, e.source, e.target, e.props ? JSON.stringify(e.props) : null]
+            // ))].reduce((a, p, i) => ({ ...a, [`p${i}`]: p }), <ParamsObject>{})
+            // values // ?
+
+            const values = [...vertices.flatMap(v => (
+                [v.id, v.name || null, v.ns || null, v.props ? JSON.stringify(v.props) : null]
+            )), ...edges.flatMap(e => (
+                [e.id || null, e.name || null, e.inverseName || null, e.ns || null, e.source, e.target, e.props ? JSON.stringify(e.props) : null]
+            ))]
+            values // ?
+
+
+            database.exec(linetrim`
+                BEGIN;
+                ${verticesInsertStatement}
+                ${edgesInsertStatement}
+                COMMIT;
+            `, ...values)
+        },
         insertVertex: <T extends RequiredOmitted<VertexModel, "id", "type">>(node: T) => {
             database.run(`INSERT INTO vertices VALUES(?, ?, ?, json(?))`, [
                 node.id,
