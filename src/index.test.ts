@@ -63,8 +63,9 @@ describe("sql", () => {
         expect([...edgeXX]).toEqual([{ source: "1", target: "2", id: "12abc", name: null, inverseName: null, ns: null, props: { fact: "abc" }, type: "edge" }]);
 
         const edge = db.getEdgeById("12abc")!
-        db.deleteEdge(edge.id);
-        const noEdge = db.getEdgeById(edge.id);
+        expect(edge.id).toBeDefined()
+        db.deleteEdge(<string>edge.id);
+        const noEdge = db.getEdgeById(<string>edge.id);
         expect(noEdge).toBeUndefined();
     })
 

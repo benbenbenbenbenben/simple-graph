@@ -85,34 +85,27 @@ export const createDb = async (schema = DefaultSchema) => {
             const vertices = vertexOrEdge.filter(t => t.type === "vertex") as VertexModel[]
             const edges = vertexOrEdge.filter(t => t.type === "edge") as EdgeModel[]
 
-            const verticesInsertStatement = vertices.length === 0 ? ''
-                : linetrim`${vertices.map((v, i) => `INSERT INTO vertices VALUES(:p${i * 4}, :p${i * 4 + 1}, :p${i * 4 + 2}, json(:p${i * 4 + 3}))`).join(";\n")};`
-            const edgesInsertStatement = edges.length === 0 ? ''
-                : linetrim`${edges.map((e, i) => `INSERT INTO edges VALUES(:p${(vertices.length * 4) + i * 7}, :p${(vertices.length * 4) + i * 7 + 1}, :p${(vertices.length * 4) + i * 7 + 2}, :p${(vertices.length * 4) + i * 7 + 3}, :p${(vertices.length * 4) + i * 7 + 4}, :p${(vertices.length * 4) + i * 7 + 5}, json(:p${(vertices.length * 4) + i * 7 + 6}))`).join(", ")}
-            `;
-            linetrim`${verticesInsertStatement}
-            ${edgesInsertStatement}` // ?
-            // const values = [...vertices.flatMap(v => (
-            //     [v.id, v.name || null, v.ns || null, v.props ? JSON.stringify(v.props) : null]
-            // )), ...edges.flatMap(e => (
-            //     [e.id || null, e.name || null, e.inverseName || null, e.ns || null, e.source, e.target, e.props ? JSON.stringify(e.props) : null]
-            // ))].reduce((a, p, i) => ({ ...a, [`p${i}`]: p }), <ParamsObject>{})
-            // values // ?
-
-            const values = [...vertices.flatMap(v => (
-                [v.id, v.name || null, v.ns || null, v.props ? JSON.stringify(v.props) : null]
-            )), ...edges.flatMap(e => (
-                [e.id || null, e.name || null, e.inverseName || null, e.ns || null, e.source, e.target, e.props ? JSON.stringify(e.props) : null]
-            ))]
-            values // ?
-
-
-            database.exec(linetrim`
-                BEGIN;
-                ${verticesInsertStatement}
-                ${edgesInsertStatement}
-                COMMIT;
-            `, ...values)
+            database.exec("BEGIN TRANSACTION")
+            vertices.forEach(vertex => {
+                database.exec("INSERT INTO vertices VALUES(?, ?, ?, json(?))", [
+                    vertex.id,
+                    vertex.name || null,
+                    vertex.ns || null,
+                    vertex.props ? JSON.stringify(vertex.props) : null
+                ])
+            })
+            edges.forEach(edge => {
+                database.exec("INSERT INTO edges VALUES(?, ?, ?, ?, ?, ?, json(?))", [
+                    edge.id || `${edge.source}:${edge.target}`,
+                    edge.name || null,
+                    edge.inverseName || null,
+                    edge.ns || null,
+                    edge.source,
+                    edge.target,
+                    edge.props ? JSON.stringify(edge.props) : null
+                ])
+            })
+            database.exec("COMMIT TRANSACTION")
         },
         insertVertex: <T extends RequiredOmitted<VertexModel, "id", "type">>(node: T) => {
             database.run(`INSERT INTO vertices VALUES(?, ?, ?, json(?))`, [
