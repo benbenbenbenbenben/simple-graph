@@ -23,12 +23,12 @@ describe("tripleStore", () => {
             const { insert } = await tripleStore(db);
             await insert("Bob", ["friendOf", "Alice"])
             expect((await db).getVertexById("Bob")).toBeDefined()
-            expect((await db).getEdgeById("friendOf")).toBeDefined()
+            expect((await db).getEdgeById("Bob:friendOf:Alice")).toBeDefined()
             expect((await db).getVertexById("Alice")).toBeDefined()
         })
     })
 
-    test("insert beatles data", async () => {
+    test.only("insert beatles data", async () => {
         const { insert, query } = await tripleStore(db)
         await insert(
             "The_Beatles",

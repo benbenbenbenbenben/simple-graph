@@ -26,8 +26,8 @@ const DefaultSchema = linetrim`
         name        TEXT,
         inverseName TEXT,
         ns          TEXT,
-        source      TEXT,
-        target      TEXT,
+        source      TEXT NOT NULL,
+        target      TEXT NOT NULL,
         props       TEXT,
         FOREIGN KEY(source) REFERENCES vertices(id),
         FOREIGN KEY(target) REFERENCES vertices(id)
@@ -96,7 +96,7 @@ export const createDb = async (schema = DefaultSchema) => {
             })
             edges.forEach(edge => {
                 database.exec("INSERT INTO edges VALUES(?, ?, ?, ?, ?, ?, json(?))", [
-                    edge.id || `${edge.source}:${edge.target}`,
+                    edge.id || null,
                     edge.name || null,
                     edge.inverseName || null,
                     edge.ns || null,
@@ -278,6 +278,8 @@ export const createDb = async (schema = DefaultSchema) => {
                 } as unknown as any
             }
         },
+        // TODO: hide this and overload raw
+        exec: database.exec.bind(database),
         raw: (sql: string, ...parameters: SqlValue[]): any[][] => {
             const paramsObject: ParamsObject = parameters.reduce((o, value, i) => {
                 return { ...o, [`:${i}`]: value }
